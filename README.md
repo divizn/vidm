@@ -6,7 +6,7 @@ A browser-based video editor using **SvelteKit 5 frontend**, **FFmpeg wasm** for
 
 ## **Folder Structure**
 
-```html
+```py
 project/
 ├ www/                         # SvelteKit frontend (UI + wasm integration)
 │  ├ src/
@@ -22,7 +22,7 @@ project/
 │
 ├ internal/                     # Go internal packages (business logic)
 │  ├ auth/                      # authentication logic (Goth)
-│  ├ store/                   # file/video storage logic (optional)
+│  ├ store/                     # file/video storage logic (optional)
 │  └ video/                     # optional video helper packages
 │
 ├ api/                          # Go server entrypoint
