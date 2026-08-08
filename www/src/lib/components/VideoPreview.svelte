@@ -18,7 +18,7 @@
 
 	video {
 		max-width: 320px;
-		aspect-ratio: 9 / 16;
+		max-height: 70vh;
 		background: #000;
 		border-radius: 0.5rem;
 	}

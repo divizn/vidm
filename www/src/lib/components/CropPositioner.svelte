@@ -1,0 +1,143 @@
+<script lang="ts">
+	import type { AspectRatio, CropRegion } from '$lib/ffmpeg/filters';
+
+	let {
+		file,
+		ratio,
+		crop = $bindable()
+	}: { file: File; ratio: AspectRatio; crop: CropRegion } = $props();
+
+	let videoEl: HTMLVideoElement | undefined = $state();
+	let sourceWidth = $state(0);
+	let sourceHeight = $state(0);
+	let renderedWidth = $state(0);
+	let renderedHeight = $state(0);
+
+	// Fraction (0-1) of the way through the available drag range, per axis.
+	let offsetXFrac = $state(0.5);
+	let offsetYFrac = $state(0.5);
+
+	const objectUrl = $derived(URL.createObjectURL(file));
+
+	function onLoadedMetadata() {
+		if (!videoEl) return;
+		sourceWidth = videoEl.videoWidth;
+		sourceHeight = videoEl.videoHeight;
+		renderedWidth = videoEl.clientWidth;
+		renderedHeight = videoEl.clientHeight;
+	}
+
+	// Largest box with the target ratio that fits inside the source frame,
+	// as a fraction of the source's own width/height.
+	const boxFrac = $derived.by(() => {
+		if (!sourceWidth || !sourceHeight) return { w: 1, h: 1 };
+		const sourceRatio = sourceWidth / sourceHeight;
+		const targetRatio = ratio.w / ratio.h;
+		return targetRatio < sourceRatio
+			? { w: (sourceRatio ? targetRatio / sourceRatio : 1), h: 1 }
+			: { w: 1, h: sourceRatio / targetRatio };
+	});
+
+	$effect(() => {
+		if (!sourceWidth || !sourceHeight) return;
+		const boxW = boxFrac.w * sourceWidth;
+		const boxH = boxFrac.h * sourceHeight;
+		const slackX = sourceWidth - boxW;
+		const slackY = sourceHeight - boxH;
+		crop = {
+			width: Math.round(boxW),
+			height: Math.round(boxH),
+			x: Math.round(offsetXFrac * slackX),
+			y: Math.round(offsetYFrac * slackY)
+		};
+	});
+
+	let dragging = false;
+	let dragStartX = 0;
+	let dragStartY = 0;
+	let dragStartOffsetX = 0;
+	let dragStartOffsetY = 0;
+
+	function onPointerDown(e: PointerEvent) {
+		dragging = true;
+		dragStartX = e.clientX;
+		dragStartY = e.clientY;
+		dragStartOffsetX = offsetXFrac;
+		dragStartOffsetY = offsetYFrac;
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+
+	function onPointerMove(e: PointerEvent) {
+		if (!dragging || !renderedWidth || !renderedHeight) return;
+		const slackXPx = (1 - boxFrac.w) * renderedWidth;
+		const slackYPx = (1 - boxFrac.h) * renderedHeight;
+		const dx = e.clientX - dragStartX;
+		const dy = e.clientY - dragStartY;
+		offsetXFrac = slackXPx > 0 ? clamp01(dragStartOffsetX + dx / slackXPx) : 0.5;
+		offsetYFrac = slackYPx > 0 ? clamp01(dragStartOffsetY + dy / slackYPx) : 0.5;
+	}
+
+	function onPointerUp() {
+		dragging = false;
+	}
+
+	function clamp01(n: number): number {
+		return Math.min(1, Math.max(0, n));
+	}
+</script>
+
+<div class="wrap">
+	<video
+		bind:this={videoEl}
+		src={objectUrl}
+		onloadedmetadata={onLoadedMetadata}
+		muted
+		playsinline
+	></video>
+	{#if sourceWidth}
+		<div
+			class="box"
+			style:width={`${boxFrac.w * 100}%`}
+			style:height={`${boxFrac.h * 100}%`}
+			style:left={`${offsetXFrac * (1 - boxFrac.w) * 100}%`}
+			style:top={`${offsetYFrac * (1 - boxFrac.h) * 100}%`}
+			onpointerdown={onPointerDown}
+			onpointermove={onPointerMove}
+			onpointerup={onPointerUp}
+		></div>
+	{/if}
+</div>
+<p class="hint">Drag the box to choose what stays in frame.</p>
+
+<style>
+	.wrap {
+		position: relative;
+		max-width: 480px;
+		margin: 0 auto;
+	}
+
+	video {
+		display: block;
+		width: 100%;
+		border-radius: 0.5rem;
+	}
+
+	.box {
+		position: absolute;
+		border: 2px solid #4f46e5;
+		background: rgba(79, 70, 229, 0.15);
+		cursor: grab;
+		touch-action: none;
+	}
+
+	.box:active {
+		cursor: grabbing;
+	}
+
+	.hint {
+		text-align: center;
+		font-size: 0.85rem;
+		color: #666;
+		margin-top: 0.35rem;
+	}
+</style>
