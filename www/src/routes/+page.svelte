@@ -15,6 +15,7 @@
 	import SpeedControl from '$lib/components/SpeedControl.svelte';
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CropPositioner from '$lib/components/CropPositioner.svelte';
+	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
@@ -110,6 +111,8 @@
 		{/if}
 
 		<button onclick={run}>Export</button>
+
+		<CaptionsPanel file={sourceFile} />
 	{/if}
 
 	{#if status === 'loading-engine'}
