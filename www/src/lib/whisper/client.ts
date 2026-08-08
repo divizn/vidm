@@ -14,11 +14,18 @@ export async function transcribeFile(
 	const transcriber = new FileTranscriber({
 		createModule,
 		model: MODEL_URL,
-		onProgress
+		onProgress,
+		print: (msg) => console.log('[whisper stdout]', msg),
+		printErr: (msg) => console.error('[whisper stderr]', msg),
+		onAbort: () => console.error('[whisper] Module.onAbort fired'),
+		onExit: (status) => console.error('[whisper] Module.onExit fired', status)
 	});
 
 	await transcriber.init();
-	const result = await transcriber.transcribe(file, { lang: 'en', threads: 2 });
+	// TEST: threads=1, in case multi-threaded computation spawns a pthread
+	// sub-worker that our print/printErr/onAbort hooks (registered on the
+	// main Module instance) don't propagate to, hiding the real crash site.
+	const result = await transcriber.transcribe(file, { lang: 'en', threads: 1 });
 	transcriber.destroy();
 
 	return result.transcription.map((seg) => ({
