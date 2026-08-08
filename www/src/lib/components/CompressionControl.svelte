@@ -13,6 +13,7 @@
 	}: { compression: CompressionSettings; disabled?: boolean } = $props();
 
 	const modes: { value: CompressionMode; label: string }[] = [
+		{ value: 'none', label: 'None' },
 		{ value: 'preset', label: 'Quality preset' },
 		{ value: 'size', label: 'Target file size' },
 		{ value: 'custom', label: 'Custom (CRF)' }
@@ -40,7 +41,9 @@
 		{/each}
 	</div>
 
-	{#if compression.mode === 'preset'}
+	{#if compression.mode === 'none'}
+		<span class="hint">Uses the encoder's default quality — no explicit target.</span>
+	{:else if compression.mode === 'preset'}
 		<div class="row">
 			{#each COMPRESSION_PRESETS as preset (preset.label)}
 				<label>
