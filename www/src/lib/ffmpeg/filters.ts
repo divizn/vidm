@@ -13,12 +13,26 @@ export const ASPECT_RATIOS: AspectRatio[] = [
 	{ label: '16:9', w: 16, h: 9 }
 ];
 
-// Output resolution: long edge fixed at 1920, short edge derived from ratio.
-export function outputDimensions(ratio: AspectRatio): { width: number; height: number } {
-	const short = Math.round((1920 * Math.min(ratio.w, ratio.h)) / Math.max(ratio.w, ratio.h));
-	return ratio.w <= ratio.h
-		? { width: short, height: 1920 }
-		: { width: 1920, height: short };
+const MAX_OUTPUT_LONG_EDGE = 1920;
+
+// libx264 requires even width/height (yuv420p chroma subsampling) — round
+// down, never up, so dimensions never exceed their source/cap.
+function toEven(n: number): number {
+	return Math.floor(n / 2) * 2;
+}
+
+// Output resolution: long edge is whatever the source actually has (capped
+// at MAX_OUTPUT_LONG_EDGE for very high-res sources), never upscaled beyond
+// it — sourceLongEdge should be the crop region's own size for crop mode,
+// or the source frame's long edge for blur-pad (which keeps the whole
+// frame). Short edge is derived from the target ratio.
+export function outputDimensions(
+	ratio: AspectRatio,
+	sourceLongEdge: number
+): { width: number; height: number } {
+	const longEdge = toEven(Math.min(MAX_OUTPUT_LONG_EDGE, sourceLongEdge));
+	const short = toEven((longEdge * Math.min(ratio.w, ratio.h)) / Math.max(ratio.w, ratio.h));
+	return ratio.w <= ratio.h ? { width: short, height: longEdge } : { width: longEdge, height: short };
 }
 
 // A region of the source frame, in source pixels — what crop mode keeps.
@@ -86,6 +100,10 @@ export interface ExportOptions {
 	crop: CropRegion;
 	compression: CompressionSettings;
 	sourceDurationSeconds: number;
+	// Source frame dimensions — used so blur-pad (which keeps the whole
+	// frame) doesn't upscale beyond what the source actually has.
+	sourceWidth: number;
+	sourceHeight: number;
 }
 
 export function buildExportArgs(
@@ -93,7 +111,8 @@ export function buildExportArgs(
 	outputName: string,
 	options: ExportOptions
 ): string[] {
-	const { mode, speed, ratio, crop, compression, sourceDurationSeconds } = options;
+	const { mode, speed, ratio, crop, compression, sourceDurationSeconds, sourceWidth, sourceHeight } =
+		options;
 
 	const needsSpeedFilters = speed !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
@@ -101,7 +120,13 @@ export function buildExportArgs(
 	// track's real bitrate isn't known ahead of time.
 	const needsAudioReencode = needsSpeedFilters || compression.mode === 'size';
 	const extraPipelines = (mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0);
-	const { width: outW, height: outH } = outputDimensions(ratio);
+
+	// Crop mode: the crop region is already sized to the target ratio, so
+	// its own dimensions are the natural (non-upscaled) output size. Blur-pad
+	// keeps the whole frame, so the source's own long edge is the reference.
+	const sourceLongEdge =
+		mode === 'crop' ? Math.max(crop.width, crop.height) : Math.max(sourceWidth, sourceHeight);
+	const { width: outW, height: outH } = outputDimensions(ratio, sourceLongEdge);
 
 	const args = ['-i', inputName];
 	if (mode === 'blur-pad') args.push('-i', inputName);
@@ -110,7 +135,7 @@ export function buildExportArgs(
 
 	if (mode === 'crop') {
 		// User-positioned crop region (already sized to the target ratio),
-		// then scaled to the fixed output resolution.
+		// scaled only if it exceeds the output cap — never upscaled.
 		args.push(
 			'-vf',
 			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}`
