@@ -4,13 +4,16 @@
 	import {
 		buildExportArgs,
 		ASPECT_RATIOS,
+		DEFAULT_COMPRESSION,
 		type ReformatMode,
-		type CropRegion
+		type CropRegion,
+		type CompressionSettings
 	} from '$lib/ffmpeg/filters';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
 	import SpeedControl from '$lib/components/SpeedControl.svelte';
+	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CropPositioner from '$lib/components/CropPositioner.svelte';
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
 
@@ -22,12 +25,18 @@
 	let mode = $state<ReformatMode>('crop');
 	let ratio = $state(ASPECT_RATIOS[0]);
 	let speed = $state(1);
+	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION });
 	let sourceFile = $state<File | null>(null);
+	let sourceDuration = $state(0);
 	let outputUrl = $state<string | null>(null);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 
 	function handleFile(file: File) {
 		sourceFile = file;
+	}
+
+	function onDurationVideoLoaded(e: Event) {
+		sourceDuration = (e.target as HTMLVideoElement).duration;
 	}
 
 	async function run() {
@@ -48,7 +57,16 @@
 			const inputName = 'input.mp4';
 			const outputName = 'output.mp4';
 			await ffmpeg.writeFile(inputName, await fetchFile(sourceFile));
-			await ffmpeg.exec(buildExportArgs(inputName, outputName, mode, speed, ratio, crop));
+			await ffmpeg.exec(
+				buildExportArgs(inputName, outputName, {
+					mode,
+					speed,
+					ratio,
+					crop,
+					compression,
+					sourceDurationSeconds: sourceDuration
+				})
+			);
 			const data = await ffmpeg.readFile(outputName);
 
 			outputUrl = URL.createObjectURL(
@@ -72,10 +90,20 @@
 		<UploadDropzone onFile={handleFile} />
 	{/if}
 
+	{#if sourceFile}
+		<!-- svelte-ignore a11y_media_has_caption -->
+		<video
+			src={URL.createObjectURL(sourceFile)}
+			onloadedmetadata={onDurationVideoLoaded}
+			hidden
+		></video>
+	{/if}
+
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
 		<FormatToggle bind:mode />
 		<RatioSelector bind:ratio />
 		<SpeedControl bind:speed />
+		<CompressionControl bind:compression />
 
 		{#if mode === 'crop'}
 			<CropPositioner file={sourceFile} {ratio} bind:crop />
