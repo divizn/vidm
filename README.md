@@ -1,87 +1,33 @@
 # vidm
 
-A browser-based video editor using **SvelteKit 5 frontend**, **FFmpeg wasm** for encoding, **Rust wasm** for CPU-heavy video processing, and **Go + Goth** for authentication.
+A browser-based tool that reformats landscape video into short-form
+portrait video (9:16) with auto-generated, styled captions burned in.
+Runs entirely client-side (ffmpeg.wasm + whisper.wasm) and works offline
+after the first load.
 
----
+**Status**: phase 1 — upload a video, reformat to portrait (center-crop
+or blur-padded), preview, and download. No captions yet.
 
-## **Folder Structure**
-
-```html
-project/
-├ www/                         # SvelteKit frontend (UI + wasm integration)
-│  ├ src/
-│  │  ├ routes/
-│  │  │  └ +page.svelte        # main editor page
-│  │  ├ lib/
-│  │  │  ├ ffmpegWorker.js     # calls ffmpeg wasm in a web worker
-│  │  │  └ wasm/               # processing wasm pkg
-│  │  │     └ pkg/
-│  │  │        ├ video_processing.js
-│  │  │        └ video_processing_bg.wasm
-│  └ package.json
-│
-├ internal/                     # Go internal packages (business logic)
-│  ├ auth/                      # authentication logic (Goth)
-│  ├ store/                   # file/video storage logic (optional)
-│  └ video/                     # optional video helper packages
-│
-├ api/                          # Go server entrypoint
-│  ├ main.go                    # HTTP server, route handlers
-│  └ go.mod
-│
-├ engine/                       # CPU-heavy tasks compiled to wasm
-│  ├ src/
-│  │  └ lib.rs                  # Rust code for frame processing / filters
-│  ├ Cargo.toml
-│  └ pkg/                       # output of `wasm-pack build --target web`
-│
-├ Makefile                      # orchestrates frontend, wasm, backend dev/build
-└ README.md
-```
-
----
-
-## **Project Overview**
-
-* **Frontend (`www/`)**
-  Handles video editor UI, timeline, file input, and video preview.
-  Calls **FFmpeg wasm** for trimming, merging, and encoding.
-  Calls **Rust wasm** for heavy per-frame processing or AI filters.
-
-* **Engine (`engine/`)**
-  Rust project compiled to WebAssembly.
-  Performs CPU-heavy operations like frame filters, AI inference, or transformations.
-  Output is imported into SvelteKit frontend.
-
-* **Backend (`api/` + `internal/`)**
-  Go api handles authentication via **Goth**, user management, and optionally video storage.
-  `internal/` contains business logic packages (`auth/`, `store/`, `video/`).
-
----
-
-## **Development Workflow**
-
-All development commands are handled via the **Makefile**.
-Run:
+## Run locally
 
 ```bash
-make help
+cd www
+pnpm install
+pnpm dev
 ```
 
-to see available commands for:
+Then open the printed local URL and upload a short video file.
 
-* Frontend development (`www`)
-* Rust wasm build (`engine`)
-* Go backend server (`server`)
-* Full project build/dev orchestration
+## Repo layout
 
----
+```
+www/         SvelteKit app — the actual tool (start here)
+api/         Go HTTP server — reserved for a later, separate auth phase
+internal/    Go packages (auth/store/video) — reserved, empty stub
+engine/      Rust-wasm stub — reserved placeholder
+```
 
-## **Next Steps / TODO**
-
-* Start project
-* Implement file upload/download UI in SvelteKit.
-* Add timeline and multi-clip editing.
-* Integrate JWT authentication from Go backend using Goth.
-* Add progress reporting for FFmpeg wasm tasks.
-* Implement optional AI-based video enhancements in Rust wasm.
+`api/`, `internal/`, `go.mod`, and `engine/` are not part of the
+client-side roadmap and aren't built yet — they're reserved for a later,
+separate phase (user accounts/auth via Go + Goth, and possibly
+cross-device project sync).

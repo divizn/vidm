@@ -1,1 +1,9 @@
+# Rust (engine/)
 /target
+
+# Local test assets (sample videos, etc.) — not meant to be committed
+/test
+
+# OS
+.DS_Store
+Thumbs.db
