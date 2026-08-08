@@ -38,17 +38,24 @@
 			: { w: 1, h: sourceRatio / targetRatio };
 	});
 
+	// libx264 requires even width/height (yuv420p chroma subsampling) —
+	// round down to the nearest even number, never up, so the crop region
+	// never exceeds the source frame.
+	function toEven(n: number): number {
+		return Math.floor(n / 2) * 2;
+	}
+
 	$effect(() => {
 		if (!sourceWidth || !sourceHeight) return;
-		const boxW = boxFrac.w * sourceWidth;
-		const boxH = boxFrac.h * sourceHeight;
+		const boxW = toEven(boxFrac.w * sourceWidth);
+		const boxH = toEven(boxFrac.h * sourceHeight);
 		const slackX = sourceWidth - boxW;
 		const slackY = sourceHeight - boxH;
 		crop = {
-			width: Math.round(boxW),
-			height: Math.round(boxH),
-			x: Math.round(offsetXFrac * slackX),
-			y: Math.round(offsetYFrac * slackY)
+			width: boxW,
+			height: boxH,
+			x: toEven(offsetXFrac * slackX),
+			y: toEven(offsetYFrac * slackY)
 		};
 	});
 

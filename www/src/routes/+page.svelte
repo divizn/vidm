@@ -28,6 +28,8 @@
 	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION });
 	let sourceFile = $state<File | null>(null);
 	let sourceDuration = $state(0);
+	let sourceWidth = $state(0);
+	let sourceHeight = $state(0);
 	let outputUrl = $state<string | null>(null);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 
@@ -35,8 +37,11 @@
 		sourceFile = file;
 	}
 
-	function onDurationVideoLoaded(e: Event) {
-		sourceDuration = (e.target as HTMLVideoElement).duration;
+	function onSourceVideoLoaded(e: Event) {
+		const video = e.target as HTMLVideoElement;
+		sourceDuration = video.duration;
+		sourceWidth = video.videoWidth;
+		sourceHeight = video.videoHeight;
 	}
 
 	async function run() {
@@ -64,7 +69,9 @@
 					ratio,
 					crop,
 					compression,
-					sourceDurationSeconds: sourceDuration
+					sourceDurationSeconds: sourceDuration,
+					sourceWidth,
+					sourceHeight
 				})
 			);
 			const data = await ffmpeg.readFile(outputName);
@@ -94,7 +101,7 @@
 		<!-- svelte-ignore a11y_media_has_caption -->
 		<video
 			src={URL.createObjectURL(sourceFile)}
-			onloadedmetadata={onDurationVideoLoaded}
+			onloadedmetadata={onSourceVideoLoaded}
 			hidden
 		></video>
 	{/if}
