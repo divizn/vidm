@@ -48,7 +48,7 @@ export interface CropRegion {
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 2;
 
-export type CompressionMode = 'preset' | 'size' | 'custom';
+export type CompressionMode = 'none' | 'preset' | 'size' | 'custom';
 
 export interface CompressionPreset {
 	label: string;
@@ -176,9 +176,12 @@ export function buildExportArgs(
 			Math.round((totalBits - audioBits) / outputDurationSec / 1000)
 		);
 		args.push('-b:v', `${videoBitrateKbps}k`);
-	} else {
+	} else if (compression.mode !== 'none') {
 		args.push('-crf', String(compression.crf));
 	}
+	// mode === 'none': no explicit -crf/-b:v — the reformat filters still force
+	// a re-encode (there's no -c:v copy path here), but libx264 picks its own
+	// default (unset CRF, effectively 23) instead of an app-chosen target.
 
 	if (extraPipelines > 0) {
 		args.push(
