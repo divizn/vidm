@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { fetchFile } from '@ffmpeg/util';
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
-	import { buildCropArgs } from '$lib/ffmpeg/filters';
+	import { buildExportArgs } from '$lib/ffmpeg/filters';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
+	import SpeedControl from '$lib/components/SpeedControl.svelte';
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
 
 	type Status = 'idle' | 'loading-engine' | 'processing' | 'done' | 'error';
@@ -10,6 +11,7 @@
 	let status = $state<Status>('idle');
 	let progress = $state(0);
 	let errorMessage = $state('');
+	let speed = $state(1);
 	let outputUrl = $state<string | null>(null);
 
 	async function handleFile(file: File) {
@@ -28,7 +30,7 @@
 			const inputName = 'input.mp4';
 			const outputName = 'output.mp4';
 			await ffmpeg.writeFile(inputName, await fetchFile(file));
-			await ffmpeg.exec(buildCropArgs(inputName, outputName));
+			await ffmpeg.exec(buildExportArgs(inputName, outputName, speed));
 			const data = await ffmpeg.readFile(outputName);
 
 			outputUrl = URL.createObjectURL(
@@ -48,6 +50,8 @@
 	<h1>vidm — portrait reformatter</h1>
 	<p>Upload a landscape video, reformat it to 9:16 (center crop), preview, and download. Runs entirely in your browser.</p>
 
+	<SpeedControl bind:speed disabled={status !== 'idle'} />
+
 	{#if !outputUrl}
 		<UploadDropzone onFile={handleFile} disabled={status === 'loading-engine' || status === 'processing'} />
 	{/if}
@@ -61,7 +65,7 @@
 	{/if}
 
 	{#if outputUrl}
-		<VideoPreview src={outputUrl} downloadName="vidm-crop.mp4" />
+		<VideoPreview src={outputUrl} downloadName={`vidm-${speed}x.mp4`} />
 		<p class="note">To reformat another video, refresh the page.</p>
 	{/if}
 </main>
