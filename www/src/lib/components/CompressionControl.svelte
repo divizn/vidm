@@ -17,7 +17,6 @@
 	}: { compression: CompressionSettings; disabled?: boolean } = $props();
 
 	const modes: { value: CompressionMode; label: string }[] = [
-		{ value: 'none', label: 'None' },
 		{ value: 'preset', label: 'Quality preset' },
 		{ value: 'size', label: 'Target file size' },
 		{ value: 'custom', label: 'Custom (CRF)' }
@@ -46,11 +45,7 @@
 		{/each}
 	</RadioGroup>
 
-	{#if compression.mode === 'none'}
-		<span class="text-muted-foreground text-sm"
-			>Uses the encoder's default quality — no explicit target.</span
-		>
-	{:else if compression.mode === 'preset'}
+	{#if compression.mode === 'preset'}
 		<div class="flex flex-wrap items-center gap-4">
 			<RadioGroup
 				value={String(compression.crf)}
