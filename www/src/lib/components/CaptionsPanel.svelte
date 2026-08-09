@@ -17,6 +17,12 @@
 			: null
 	);
 
+	const transcript = $derived(
+		segments
+			.map((seg) => seg.text.trim())
+			.join(' ')
+	);
+
 	async function generate() {
 		status = 'transcribing';
 		progress = 0;
@@ -55,6 +61,10 @@
 	{/if}
 
 	{#if status === 'done'}
+		<div class="transcript">
+			<h3>Transcript</h3>
+			<p>{transcript}</p>
+		</div>
 		<ul class="segments">
 			{#each segments as segment, i (i)}
 				<li>
@@ -79,6 +89,17 @@
 	h2 {
 		font-size: 1rem;
 		margin: 0;
+	}
+
+	.transcript h3 {
+		font-size: 0.85rem;
+		margin: 0 0 0.25rem;
+		color: #666;
+	}
+
+	.transcript p {
+		margin: 0;
+		white-space: pre-wrap;
 	}
 
 	.error {
