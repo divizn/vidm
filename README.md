@@ -53,16 +53,8 @@ and push to main — `main` is branch-protected on them passing.
 `.github/workflows/deploy.yml` builds `www/` and deploys it to
 Cloudflare Pages (project `vidm`) via `wrangler pages deploy` on every
 push to `main`. Requires `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` repo secrets.
-
-**Currently broken, no live URL yet**: the first deploy failed because
-`ffmpeg-core.wasm` (31.2 MiB) exceeds Cloudflare Pages' 25 MiB
-per-file limit on static assets. This is the asset-hosting problem
-called out in [CLAUDE.md](./CLAUDE.md)'s "Known Hard Part" /
-Roadmap phase 4 — self-hosting the large ffmpeg-core/Whisper-model
-blobs needs a real strategy, not a plain static deploy. A `wrangler.jsonc`
-R2 bucket binding (`ASSETS_BUCKET`) is reserved for this but not yet
-wired up to serve those assets.
+`CLOUDFLARE_ACCOUNT_ID` repo secrets. See the Deploy badge above for
+current status.
 
 ## Status
 
@@ -82,6 +74,5 @@ wired up to serve those assets.
   asset caching strategy are still to come.
 - **UI**: redesigned on shadcn-svelte + Tailwind v4, with a manual
   dark/light theme toggle (defaults to system preference, persisted).
-- **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Pages)
-  but the first deploy fails on asset size — see
-  [Deployment](#deployment). No live URL yet.
+- **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Pages),
+  see [Deployment](#deployment) and the badge above for current status.
