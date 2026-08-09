@@ -17,6 +17,12 @@
 	let offsetXFrac = $state(0.5);
 	let offsetYFrac = $state(0.5);
 
+	// 1 = the largest box that fits the ratio (the old fixed behavior);
+	// smaller zooms in, cropping a tighter region. Bounded below so the
+	// crop region can't shrink to something degenerate.
+	const MIN_BOX_SCALE = 0.3;
+	let boxScale = $state(1);
+
 	const objectUrl = $derived(URL.createObjectURL(file));
 
 	function onLoadedMetadata() {
@@ -33,7 +39,8 @@
 	}
 
 	// Largest box with the target ratio that fits inside the source frame,
-	// as a fraction of the source's own width/height.
+	// as a fraction of the source's own width/height — the boxScale=1
+	// reference size that resizing scales down from.
 	const boxFrac = $derived.by(() => {
 		if (!sourceWidth || !sourceHeight) return { w: 1, h: 1 };
 		const sourceRatio = sourceWidth / sourceHeight;
@@ -42,6 +49,10 @@
 			? { w: (sourceRatio ? targetRatio / sourceRatio : 1), h: 1 }
 			: { w: 1, h: sourceRatio / targetRatio };
 	});
+
+	// The box's actual on-screen size, after applying the resize scale —
+	// still exactly ratio-locked, since both axes scale by the same factor.
+	const boxSizeFrac = $derived({ w: boxFrac.w * boxScale, h: boxFrac.h * boxScale });
 
 	// libx264 requires even width/height (yuv420p chroma subsampling) —
 	// round down to the nearest even number, never up, so the crop region
@@ -52,8 +63,8 @@
 
 	$effect(() => {
 		if (!sourceWidth || !sourceHeight) return;
-		const boxW = toEven(boxFrac.w * sourceWidth);
-		const boxH = toEven(boxFrac.h * sourceHeight);
+		const boxW = toEven(boxSizeFrac.w * sourceWidth);
+		const boxH = toEven(boxSizeFrac.h * sourceHeight);
 		const slackX = sourceWidth - boxW;
 		const slackY = sourceHeight - boxH;
 		crop = {
@@ -81,8 +92,8 @@
 
 	function onPointerMove(e: PointerEvent) {
 		if (!dragging || !renderedWidth || !renderedHeight) return;
-		const slackXPx = (1 - boxFrac.w) * renderedWidth;
-		const slackYPx = (1 - boxFrac.h) * renderedHeight;
+		const slackXPx = (1 - boxSizeFrac.w) * renderedWidth;
+		const slackYPx = (1 - boxSizeFrac.h) * renderedHeight;
 		const dx = e.clientX - dragStartX;
 		const dy = e.clientY - dragStartY;
 		offsetXFrac = slackXPx > 0 ? clamp01(dragStartOffsetX + dx / slackXPx) : 0.5;
@@ -91,6 +102,47 @@
 
 	function onPointerUp() {
 		dragging = false;
+	}
+
+	// Resize via the bottom-right handle, anchored at the box's current
+	// top-left corner (that corner stays put; only the opposite corner
+	// moves) — horizontal drag distance alone drives the scale, since the
+	// ratio lock means the vertical size is already implied by it.
+	let resizing = false;
+	let resizeStartX = 0;
+	let resizeStartScale = 1;
+	let resizeAnchorLeftPx = 0;
+	let resizeAnchorTopPx = 0;
+
+	function onResizePointerDown(e: PointerEvent) {
+		e.stopPropagation();
+		if (!renderedWidth || !renderedHeight) return;
+		resizing = true;
+		resizeStartX = e.clientX;
+		resizeStartScale = boxScale;
+		resizeAnchorLeftPx = offsetXFrac * (1 - boxSizeFrac.w) * renderedWidth;
+		resizeAnchorTopPx = offsetYFrac * (1 - boxSizeFrac.h) * renderedHeight;
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+
+	function onResizePointerMove(e: PointerEvent) {
+		if (!resizing || !renderedWidth || !boxFrac.w) return;
+		const maxWidthPx = boxFrac.w * renderedWidth;
+		const minWidthPx = boxFrac.w * MIN_BOX_SCALE * renderedWidth;
+		const startWidthPx = boxFrac.w * resizeStartScale * renderedWidth;
+		const dx = e.clientX - resizeStartX;
+		const newWidthPx = Math.min(maxWidthPx, Math.max(minWidthPx, startWidthPx + dx));
+		boxScale = newWidthPx / maxWidthPx;
+
+		const newSizeFrac = { w: boxFrac.w * boxScale, h: boxFrac.h * boxScale };
+		const slackXPx = (1 - newSizeFrac.w) * renderedWidth;
+		const slackYPx = (1 - newSizeFrac.h) * renderedHeight;
+		offsetXFrac = slackXPx > 0 ? clamp01(resizeAnchorLeftPx / slackXPx) : 0.5;
+		offsetYFrac = slackYPx > 0 ? clamp01(resizeAnchorTopPx / slackYPx) : 0.5;
+	}
+
+	function onResizePointerUp() {
+		resizing = false;
 	}
 
 	function clamp01(n: number): number {
@@ -110,16 +162,23 @@
 	{#if sourceWidth}
 		<div
 			class="border-primary bg-primary/20 absolute cursor-grab touch-none border-2 active:cursor-grabbing"
-			style:width={`${boxFrac.w * 100}%`}
-			style:height={`${boxFrac.h * 100}%`}
-			style:left={`${offsetXFrac * (1 - boxFrac.w) * 100}%`}
-			style:top={`${offsetYFrac * (1 - boxFrac.h) * 100}%`}
+			style:width={`${boxSizeFrac.w * 100}%`}
+			style:height={`${boxSizeFrac.h * 100}%`}
+			style:left={`${offsetXFrac * (1 - boxSizeFrac.w) * 100}%`}
+			style:top={`${offsetYFrac * (1 - boxSizeFrac.h) * 100}%`}
 			onpointerdown={onPointerDown}
 			onpointermove={onPointerMove}
 			onpointerup={onPointerUp}
-		></div>
+		>
+			<div
+				class="border-primary bg-primary absolute -right-1.5 -bottom-1.5 size-4 touch-none rounded-full border-2 cursor-nwse-resize"
+				onpointerdown={onResizePointerDown}
+				onpointermove={onResizePointerMove}
+				onpointerup={onResizePointerUp}
+			></div>
+		</div>
 	{/if}
 </div>
 <p class="text-muted-foreground mt-1.5 text-center text-sm">
-	Drag the box to choose what stays in frame.
+	Drag the box to reposition, or the corner handle to resize.
 </p>
