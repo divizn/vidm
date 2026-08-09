@@ -10,7 +10,8 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"postinstall": "node scripts/copy-ffmpeg-core.mjs && node scripts/setup-whisper.mjs",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest run"
 	},
 	"dependencies": {
 		"@ffmpeg/ffmpeg": "^0.12.15",
@@ -26,6 +27,7 @@
 		"svelte": "^5.41.0",
 		"svelte-check": "^4.3.3",
 		"typescript": "^5.9.3",
-		"vite": "^7.1.10"
+		"vite": "^7.1.10",
+		"vitest": "^4.1.10"
 	}
 }
