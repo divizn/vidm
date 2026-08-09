@@ -134,6 +134,23 @@ export function getActiveCaption(segments: CaptionSegment[], time: number): Acti
 	return clamped.map((w, i) => ({ text: w.text, highlighted: i === activeIndex }));
 }
 
+// Advances the illustrative caption-style preview's synthetic clock by
+// deltaSeconds, wrapping back to the first segment's start (not 0) once
+// past the last segment's end — avoids the loop sitting on a dead silent
+// gap if there's lead-in before captions begin. Used by CaptionPreview's
+// auto-cycling demo, which has no real video/audio driving a `timeupdate`.
+export function advancePreviewTime(
+	current: number,
+	deltaSeconds: number,
+	segments: CaptionSegment[]
+): number {
+	if (segments.length === 0) return 0;
+	const start = parseSrtTimestamp(segments[0].from);
+	const end = parseSrtTimestamp(segments[segments.length - 1].to);
+	const next = current + deltaSeconds;
+	return next >= end ? start : next;
+}
+
 // Builds a full .ass subtitle document for burn-in via FFmpeg's `ass`
 // filter. width/height must match the output frame size exactly (PlayResX/
 // PlayResY) so libass doesn't apply its own auto-scaling on top of ours.

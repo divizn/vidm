@@ -1,122 +1,58 @@
 <script lang="ts">
-	import PlayIcon from '@lucide/svelte/icons/play';
-	import PauseIcon from '@lucide/svelte/icons/pause';
 	import CaptionOverlay from './CaptionOverlay.svelte';
-	import { Button } from '$lib/components/ui/button';
-	import { Slider } from '$lib/components/ui/slider';
+	import { advancePreviewTime, parseSrtTimestamp } from '$lib/captions/ass';
 	import type { CaptionSegment } from '$lib/whisper/srt';
 	import type { CaptionStyle } from '$lib/captions/style';
 
-	let { file, segments, style }: { file: File; segments: CaptionSegment[]; style: CaptionStyle } =
-		$props();
+	let { segments, style }: { segments: CaptionSegment[]; style: CaptionStyle } = $props();
 
-	let videoEl: HTMLVideoElement | undefined = $state();
-	let currentTime = $state(0);
-	let duration = $state(0);
-	let paused = $state(true);
-	let containerHeight = $state(0);
-	// True only while the user is dragging the scrub slider — avoids the
-	// video's own timeupdate events fighting the drag position.
-	let seeking = $state(false);
+	const PREVIEW_HEIGHT_PX = 224;
 
-	const objectUrl = $derived(URL.createObjectURL(file));
+	let previewTime = $state(segments[0] ? parseSrtTimestamp(segments[0].from) : 0);
 
-	// Recomputed on every timeupdate (fires several times a second during
-	// playback anyway) rather than via a ResizeObserver — cheap, and this is
-	// only a preview widget, so staying stale until the next tick after a
-	// window resize is an acceptable tradeoff for the simpler code.
-	function onTimeUpdate() {
-		if (!videoEl || seeking) return;
-		currentTime = videoEl.currentTime;
-		containerHeight = videoEl.clientHeight;
-	}
+	// Auto-cycles the preview's synthetic clock — there's no real video/audio
+	// to drive it, so this is a standalone rAF loop instead of a `timeupdate`
+	// listener. `segments` is read fresh on every tick via the reactive prop
+	// (not a snapshot captured at effect-start), so editing caption text
+	// mid-preview stays in sync without restarting the loop.
+	//
+	// Checked once (not reactively) — there's no scrubbing/pause control by
+	// design, so a user with prefers-reduced-motion set just gets the preview
+	// parked on the first segment's start instead of looping indefinitely.
+	const prefersReducedMotion =
+		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-	function onLoadedMetadata() {
-		if (!videoEl) return;
-		duration = videoEl.duration;
-		containerHeight = videoEl.clientHeight;
-	}
+	$effect(() => {
+		if (prefersReducedMotion) return;
 
-	function togglePlay() {
-		if (!videoEl) return;
-		if (videoEl.paused) videoEl.play();
-		else videoEl.pause();
-	}
+		let rafId: number;
+		let lastTimestamp: number | undefined;
 
-	function onSeek(value: number) {
-		seeking = true;
-		currentTime = value;
-		if (videoEl) videoEl.currentTime = value;
-	}
+		function tick(timestamp: number) {
+			if (lastTimestamp !== undefined) {
+				const deltaSeconds = (timestamp - lastTimestamp) / 1000;
+				previewTime = advancePreviewTime(previewTime, deltaSeconds, segments);
+			}
+			lastTimestamp = timestamp;
+			rafId = requestAnimationFrame(tick);
+		}
 
-	function onSeekCommit() {
-		seeking = false;
-	}
-
-	function formatTime(seconds: number): string {
-		const s = Math.floor(seconds % 60);
-		const m = Math.floor(seconds / 60);
-		return `${m}:${String(s).padStart(2, '0')}`;
-	}
-
-	// The browser's native right-click "Full screen"/"Picture in picture"
-	// context menu fullscreens the bare <video> element, leaving the caption
-	// overlay (a separate sibling element) behind — captions would just
-	// disappear. There's no cross-browser API to fullscreen the video+overlay
-	// pair together as one unit reliably, so block those entry points instead
-	// (no `controls` attribute means there's no built-in fullscreen button to
-	// worry about either).
-	function onContextMenu(e: MouseEvent) {
-		e.preventDefault();
-	}
+		rafId = requestAnimationFrame(tick);
+		return () => cancelAnimationFrame(rafId);
+	});
 </script>
 
-<div class="relative mx-auto max-w-[420px]">
-	<!-- svelte-ignore a11y_media_has_caption -->
-	<video
-		bind:this={videoEl}
-		src={objectUrl}
-		playsinline
-		disablePictureInPicture
-		disableRemotePlayback
-		oncontextmenu={onContextMenu}
-		ontimeupdate={onTimeUpdate}
-		onloadedmetadata={onLoadedMetadata}
-		onplay={() => (paused = false)}
-		onpause={() => (paused = true)}
-		class="block w-full rounded-md bg-black"
-	></video>
-	{#if containerHeight > 0}
-		<CaptionOverlay {segments} {style} {currentTime} {containerHeight} />
-	{/if}
-</div>
-
-<!-- Custom controls, placed below the frame rather than the browser's
-     native overlay controls — those would sit on top of bottom-positioned
-     captions and make the preview unreadable. -->
-<div class="mx-auto flex max-w-[420px] items-center gap-2 pt-2">
-	<Button size="icon" variant="outline" onclick={togglePlay} aria-label={paused ? 'Play' : 'Pause'}>
-		{#if paused}
-			<PlayIcon class="size-4" />
-		{:else}
-			<PauseIcon class="size-4" />
-		{/if}
-	</Button>
-	<span class="text-muted-foreground w-9 shrink-0 text-xs tabular-nums">{formatTime(currentTime)}</span>
-	<Slider
-		type="single"
-		min={0}
-		max={duration || 1}
-		step={0.01}
-		value={currentTime}
-		onValueChange={onSeek}
-		onValueCommit={onSeekCommit}
-		class="flex-1"
+<div
+	class="relative mx-auto max-w-[420px] overflow-hidden rounded-md bg-black"
+	style:height={`${PREVIEW_HEIGHT_PX}px`}
+>
+	<CaptionOverlay
+		{segments}
+		{style}
+		currentTime={previewTime}
+		containerHeight={PREVIEW_HEIGHT_PX}
 	/>
-	<span class="text-muted-foreground w-9 shrink-0 text-right text-xs tabular-nums"
-		>{formatTime(duration)}</span
-	>
 </div>
 <p class="text-muted-foreground mt-1.5 text-center text-sm">
-	Preview only — text/timing match the export, exact framing depends on the reformat mode.
+	Preview of caption styling — cycles through your actual transcript, not the final video frame.
 </p>
