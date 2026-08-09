@@ -1,6 +1,7 @@
 # vidm
 
 ![CI](https://github.com/divizn/vidm/actions/workflows/ci.yml/badge.svg)
+![Deploy](https://github.com/divizn/vidm/actions/workflows/deploy.yml/badge.svg)
 
 A browser-based tool that reformats landscape video into short-form
 portrait video (9:16) with auto-generated, styled captions burned in.
@@ -47,6 +48,14 @@ pnpm build  # production build
 Same three commands run in CI (`.github/workflows/ci.yml`) on every PR
 and push to main — `main` is branch-protected on them passing.
 
+## Deployment
+
+`.github/workflows/deploy.yml` builds `www/` and deploys it to
+Cloudflare Pages (project `vidm`) via `wrangler pages deploy` on every
+push to `main`. Requires `CLOUDFLARE_API_TOKEN` and
+`CLOUDFLARE_ACCOUNT_ID` repo secrets. See the Deploy badge above for
+current status.
+
 ## Status
 
 - **Reformat (done)**: upload a video, reformat to portrait 9:16 (also
@@ -65,4 +74,5 @@ and push to main — `main` is branch-protected on them passing.
   asset caching strategy are still to come.
 - **UI**: redesigned on shadcn-svelte + Tailwind v4, with a manual
   dark/light theme toggle (defaults to system preference, persisted).
-- **Deployment**: none. No hosting is configured — there is no live URL.
+- **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Pages),
+  see [Deployment](#deployment) and the badge above for current status.
