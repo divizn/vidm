@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { transcribeFile } from '$lib/whisper/client';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
+	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
+	import { Button } from '$lib/components/ui/button';
+	import { Input } from '$lib/components/ui/input';
 
 	let { file }: { file: File } = $props();
 
@@ -17,11 +20,7 @@
 			: null
 	);
 
-	const transcript = $derived(
-		segments
-			.map((seg) => seg.text.trim())
-			.join(' ')
-	);
+	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
 
 	async function generate() {
 		status = 'transcribing';
@@ -48,87 +47,38 @@
 	}
 </script>
 
-<div class="panel">
-	<h2>Captions</h2>
-
-	{#if status === 'idle'}
-		<button onclick={generate}>Generate captions</button>
-	{:else if status === 'transcribing'}
-		<p>Transcribing… {progress}%</p>
-	{:else if status === 'error'}
-		<p class="error">Something went wrong: {errorMessage}</p>
-		<button onclick={generate}>Retry</button>
-	{/if}
-
-	{#if status === 'done'}
-		<div class="transcript">
-			<h3>Transcript</h3>
-			<p>{transcript}</p>
-		</div>
-		<ul class="segments">
-			{#each segments as segment, i (i)}
-				<li>
-					<span class="time">{segment.from} → {segment.to}</span>
-					<input type="text" bind:value={segment.text} />
-				</li>
-			{/each}
-		</ul>
-		{#if srtUrl}
-			<a href={srtUrl} download="captions.srt">Download captions.srt</a>
+<Card>
+	<CardHeader>
+		<CardTitle>Captions</CardTitle>
+	</CardHeader>
+	<CardContent class="space-y-4">
+		{#if status === 'idle'}
+			<Button onclick={generate}>Generate captions</Button>
+		{:else if status === 'transcribing'}
+			<p class="text-muted-foreground text-sm">Transcribing… {progress}%</p>
+		{:else if status === 'error'}
+			<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
+			<Button onclick={generate}>Retry</Button>
 		{/if}
-	{/if}
-</div>
 
-<style>
-	.panel {
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-	}
-
-	h2 {
-		font-size: 1rem;
-		margin: 0;
-	}
-
-	.transcript h3 {
-		font-size: 0.85rem;
-		margin: 0 0 0.25rem;
-		color: #666;
-	}
-
-	.transcript p {
-		margin: 0;
-		white-space: pre-wrap;
-	}
-
-	.error {
-		color: #dc2626;
-	}
-
-	.segments {
-		list-style: none;
-		margin: 0;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-		max-height: 16rem;
-		overflow-y: auto;
-	}
-
-	.segments li {
-		display: flex;
-		flex-direction: column;
-		gap: 0.2rem;
-	}
-
-	.time {
-		font-size: 0.75rem;
-		color: #666;
-	}
-
-	input[type='text'] {
-		padding: 0.35rem 0.5rem;
-	}
-</style>
+		{#if status === 'done'}
+			<div class="space-y-1">
+				<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
+				<p class="text-sm whitespace-pre-wrap">{transcript}</p>
+			</div>
+			<ul class="max-h-64 space-y-2 overflow-y-auto">
+				{#each segments as segment, i (i)}
+					<li class="space-y-1">
+						<span class="text-muted-foreground text-xs">{segment.from} → {segment.to}</span>
+						<Input type="text" bind:value={segment.text} />
+					</li>
+				{/each}
+			</ul>
+			{#if srtUrl}
+				<Button href={srtUrl} download="captions.srt" variant="outline"
+					>Download captions.srt</Button
+				>
+			{/if}
+		{/if}
+	</CardContent>
+</Card>

@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { cn } from '$lib/utils';
+
 	let { onFile, disabled = false }: { onFile: (file: File) => void; disabled?: boolean } =
 		$props();
 
@@ -18,9 +20,11 @@
 </script>
 
 <label
-	class="dropzone"
-	class:dragging={isDragging}
-	class:disabled
+	class={cn(
+		'border-input bg-muted/30 hover:bg-muted/50 flex min-h-48 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed p-6 text-center transition-colors',
+		isDragging && 'border-primary bg-primary/5',
+		disabled && 'pointer-events-none opacity-50'
+	)}
 	ondragover={(e) => {
 		e.preventDefault();
 		isDragging = true;
@@ -29,29 +33,5 @@
 	ondrop={handleDrop}
 >
 	<input type="file" accept="video/*" onchange={handleChange} {disabled} hidden />
-	<span>Drop a video here, or click to choose a file</span>
+	<span class="text-muted-foreground text-sm">Drop a video here, or click to choose a file</span>
 </label>
-
-<style>
-	.dropzone {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		min-height: 12rem;
-		border: 2px dashed #888;
-		border-radius: 0.5rem;
-		cursor: pointer;
-		text-align: center;
-		padding: 1rem;
-	}
-
-	.dropzone.dragging {
-		border-color: #4f46e5;
-		background: rgba(79, 70, 229, 0.08);
-	}
-
-	.dropzone.disabled {
-		opacity: 0.5;
-		pointer-events: none;
-	}
-</style>

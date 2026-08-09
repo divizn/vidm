@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { ReformatMode } from '$lib/ffmpeg/filters';
+	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group';
+	import { Label } from '$lib/components/ui/label';
 
 	let {
 		mode = $bindable(),
@@ -12,34 +14,19 @@
 	];
 </script>
 
-<fieldset {disabled}>
-	<legend>Portrait format</legend>
-	{#each options as option (option.value)}
-		<label>
-			<input type="radio" name="reformat-mode" value={option.value} bind:group={mode} />
-			{option.label}
-		</label>
-	{/each}
+<fieldset {disabled} class="space-y-2">
+	<legend class="mb-1 text-sm font-semibold">Portrait format</legend>
+	<RadioGroup
+		value={mode}
+		onValueChange={(v) => (mode = v as ReformatMode)}
+		{disabled}
+		class="flex w-auto flex-row gap-4"
+	>
+		{#each options as option (option.value)}
+			<div class="flex items-center gap-2">
+				<RadioGroupItem value={option.value} id="format-{option.value}" />
+				<Label for="format-{option.value}" class="cursor-pointer font-normal">{option.label}</Label>
+			</div>
+		{/each}
+	</RadioGroup>
 </fieldset>
-
-<style>
-	fieldset {
-		display: flex;
-		gap: 1rem;
-		align-items: center;
-		border: none;
-		padding: 0;
-	}
-
-	legend {
-		font-weight: 600;
-		margin-right: 0.5rem;
-	}
-
-	label {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		cursor: pointer;
-	}
-</style>

@@ -93,17 +93,18 @@
 	}
 </script>
 
-<div class="wrap">
+<div class="relative mx-auto max-w-[480px]">
 	<video
 		bind:this={videoEl}
 		src={objectUrl}
 		onloadedmetadata={onLoadedMetadata}
 		muted
 		playsinline
+		class="block w-full rounded-md"
 	></video>
 	{#if sourceWidth}
 		<div
-			class="box"
+			class="absolute cursor-grab touch-none border-2 border-blue-500 bg-blue-500/15 active:cursor-grabbing"
 			style:width={`${boxFrac.w * 100}%`}
 			style:height={`${boxFrac.h * 100}%`}
 			style:left={`${offsetXFrac * (1 - boxFrac.w) * 100}%`}
@@ -114,37 +115,6 @@
 		></div>
 	{/if}
 </div>
-<p class="hint">Drag the box to choose what stays in frame.</p>
-
-<style>
-	.wrap {
-		position: relative;
-		max-width: 480px;
-		margin: 0 auto;
-	}
-
-	video {
-		display: block;
-		width: 100%;
-		border-radius: 0.5rem;
-	}
-
-	.box {
-		position: absolute;
-		border: 2px solid #4f46e5;
-		background: rgba(79, 70, 229, 0.15);
-		cursor: grab;
-		touch-action: none;
-	}
-
-	.box:active {
-		cursor: grabbing;
-	}
-
-	.hint {
-		text-align: center;
-		font-size: 0.85rem;
-		color: #666;
-		margin-top: 0.35rem;
-	}
-</style>
+<p class="text-muted-foreground mt-1.5 text-center text-sm">
+	Drag the box to choose what stays in frame.
+</p>

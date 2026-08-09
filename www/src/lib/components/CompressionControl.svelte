@@ -6,6 +6,10 @@
 		type CompressionSettings,
 		type CompressionMode
 	} from '$lib/ffmpeg/filters';
+	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group';
+	import { Label } from '$lib/components/ui/label';
+	import { Input } from '$lib/components/ui/input';
+	import { Slider } from '$lib/components/ui/slider';
 
 	let {
 		compression = $bindable(),
@@ -24,105 +28,78 @@
 	}
 </script>
 
-<fieldset {disabled}>
-	<legend>Compression</legend>
+<fieldset {disabled} class="space-y-3">
+	<legend class="mb-1 text-sm font-semibold">Compression</legend>
 
-	<div class="modes">
+	<RadioGroup
+		value={compression.mode}
+		onValueChange={(v) => setMode(v as CompressionMode)}
+		{disabled}
+		class="flex w-auto flex-row flex-wrap gap-4"
+	>
 		{#each modes as m (m.value)}
-			<label>
-				<input
-					type="radio"
-					name="compression-mode"
-					checked={compression.mode === m.value}
-					onchange={() => setMode(m.value)}
-				/>
-				{m.label}
-			</label>
+			<div class="flex items-center gap-2">
+				<RadioGroupItem value={m.value} id="compression-mode-{m.value}" />
+				<Label for="compression-mode-{m.value}" class="cursor-pointer font-normal">{m.label}</Label
+				>
+			</div>
 		{/each}
-	</div>
+	</RadioGroup>
 
 	{#if compression.mode === 'none'}
-		<span class="hint">Uses the encoder's default quality — no explicit target.</span>
+		<span class="text-muted-foreground text-sm"
+			>Uses the encoder's default quality — no explicit target.</span
+		>
 	{:else if compression.mode === 'preset'}
-		<div class="row">
-			{#each COMPRESSION_PRESETS as preset (preset.label)}
-				<label>
-					<input
-						type="radio"
-						name="compression-preset"
-						checked={compression.crf === preset.crf}
-						onchange={() => (compression = { ...compression, crf: preset.crf })}
-					/>
-					{preset.label}
-				</label>
-			{/each}
+		<div class="flex flex-wrap items-center gap-4">
+			<RadioGroup
+				value={String(compression.crf)}
+				onValueChange={(v) => (compression = { ...compression, crf: Number(v) })}
+				{disabled}
+				class="flex w-auto flex-row flex-wrap gap-4"
+			>
+				{#each COMPRESSION_PRESETS as preset (preset.label)}
+					<div class="flex items-center gap-2">
+						<RadioGroupItem value={String(preset.crf)} id="compression-preset-{preset.crf}" />
+						<Label for="compression-preset-{preset.crf}" class="cursor-pointer font-normal"
+							>{preset.label}</Label
+						>
+					</div>
+				{/each}
+			</RadioGroup>
 		</div>
 	{:else if compression.mode === 'size'}
-		<div class="row">
-			<label>
-				Target size:
-				<input
-					type="number"
-					min="1"
-					step="1"
-					bind:value={compression.targetMB}
-				/>
-				MB
-			</label>
-			<span class="hint">Approximate, not exact — single-pass encode.</span>
+		<div class="flex flex-wrap items-center gap-3">
+			<Label for="target-size" class="font-normal">Target size:</Label>
+			<Input
+				id="target-size"
+				type="number"
+				min="1"
+				step="1"
+				class="w-20"
+				bind:value={compression.targetMB}
+			/>
+			<span class="text-sm">MB</span>
+			<span class="text-muted-foreground text-sm">Approximate, not exact — single-pass encode.</span
+			>
 		</div>
 	{:else}
-		<div class="row">
-			<label>
-				CRF:
-				<input
-					type="range"
-					min={MIN_CRF}
-					max={MAX_CRF}
-					bind:value={compression.crf}
-				/>
-				{compression.crf}
-			</label>
-			<span class="hint">Lower = higher quality, larger file.</span>
+		<div class="flex max-w-sm flex-wrap items-center gap-3">
+			<Label for="crf-slider" class="font-normal">CRF:</Label>
+			<Slider
+				id="crf-slider"
+				type="single"
+				min={MIN_CRF}
+				max={MAX_CRF}
+				value={compression.crf}
+				onValueChange={(v) => (compression = { ...compression, crf: v })}
+				{disabled}
+				class="w-40"
+			/>
+			<span class="text-sm tabular-nums">{compression.crf}</span>
+			<span class="text-muted-foreground w-full text-sm"
+				>Lower = higher quality, larger file.</span
+			>
 		</div>
 	{/if}
 </fieldset>
-
-<style>
-	fieldset {
-		border: none;
-		padding: 0;
-		display: flex;
-		flex-direction: column;
-		gap: 0.5rem;
-	}
-
-	legend {
-		font-weight: 600;
-		margin-bottom: 0.35rem;
-	}
-
-	.modes,
-	.row {
-		display: flex;
-		gap: 1rem;
-		align-items: center;
-		flex-wrap: wrap;
-	}
-
-	label {
-		display: flex;
-		align-items: center;
-		gap: 0.35rem;
-		cursor: pointer;
-	}
-
-	.hint {
-		font-size: 0.85rem;
-		color: #666;
-	}
-
-	input[type='number'] {
-		width: 4rem;
-	}
-</style>
