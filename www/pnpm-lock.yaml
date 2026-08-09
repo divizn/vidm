@@ -14,6 +14,12 @@ importers:
       '@ffmpeg/util':
         specifier: ^0.12.2
         version: 0.12.2
+      '@transcribe/shout':
+        specifier: ^1.0.7
+        version: 1.0.7
+      '@transcribe/transcriber':
+        specifier: ^3.0.1
+        version: 3.0.1(@transcribe/shout@1.0.7)
     devDependencies:
       '@ffmpeg/core-mt':
         specifier: ^0.12.10
@@ -383,6 +389,14 @@ packages:
     peerDependencies:
       svelte: ^5.0.0
       vite: ^6.3.0 || ^7.0.0
+
+  '@transcribe/shout@1.0.7':
+    resolution: {integrity: sha512-1QCe9oJYimE2bh4kzZZjHr3645ICvEPF31XPOXnH2WUU41FmG7a6RHAvpuaPAGDhUf5ASdzLP/hwMLsquffnWw==}
+
+  '@transcribe/transcriber@3.0.1':
+    resolution: {integrity: sha512-zppcSobOufAia0CAtNSi+dOyECATPeXBju8NEU7qgCKJS++A/BfHX0ch1qhSq+xVUUrF8bJxarK93aPC9L4HNg==}
+    peerDependencies:
+      '@transcribe/shout': ~1.0.7
 
   '@types/cookie@0.6.0':
     resolution: {integrity: sha512-4Kh9a6B2bQciAhf7FSuMRRkUWecJgJu9nPnx3yzpsfXX/c50REIqpHY4C82bXP90qrLtXtkDxTZosYO3UpOwlA==}
@@ -822,6 +836,12 @@ snapshots:
       vitefu: 1.1.1(vite@7.2.2)
     transitivePeerDependencies:
       - supports-color
+
+  '@transcribe/shout@1.0.7': {}
+
+  '@transcribe/transcriber@3.0.1(@transcribe/shout@1.0.7)':
+    dependencies:
+      '@transcribe/shout': 1.0.7
 
   '@types/cookie@0.6.0': {}
 

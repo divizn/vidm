@@ -8,13 +8,15 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"postinstall": "node scripts/copy-ffmpeg-core.mjs",
+		"postinstall": "node scripts/copy-ffmpeg-core.mjs && node scripts/setup-whisper.mjs",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
 	},
 	"dependencies": {
 		"@ffmpeg/ffmpeg": "^0.12.15",
-		"@ffmpeg/util": "^0.12.2"
+		"@ffmpeg/util": "^0.12.2",
+		"@transcribe/shout": "^1.0.7",
+		"@transcribe/transcriber": "^3.0.1"
 	},
 	"devDependencies": {
 		"@ffmpeg/core-mt": "^0.12.10",
