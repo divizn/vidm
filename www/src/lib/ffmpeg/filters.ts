@@ -104,6 +104,28 @@ export interface ExportOptions {
 	// frame) doesn't upscale beyond what the source actually has.
 	sourceWidth: number;
 	sourceHeight: number;
+	// Path (in ffmpeg's FS) to a pre-built .ass subtitle file to burn in via
+	// the `ass` filter, alongside a `fontsdir` directory holding the font(s)
+	// it references — building that file is the caller's job (see
+	// $lib/captions/ass.ts), buildExportArgs only wires the filter in.
+	captionsAssPath?: string;
+	captionsFontsDir?: string;
+}
+
+// The final output frame size for a given mode/ratio/crop/source — exposed
+// separately from buildExportArgs so callers that need it ahead of export
+// (e.g. sizing a caption burn-in's ASS PlayResX/PlayResY to match exactly)
+// don't have to duplicate this logic.
+export function computeOutputDimensions(
+	options: Pick<ExportOptions, 'mode' | 'ratio' | 'crop' | 'sourceWidth' | 'sourceHeight'>
+): { width: number; height: number } {
+	const { mode, ratio, crop, sourceWidth, sourceHeight } = options;
+	// Crop mode: the crop region is already sized to the target ratio, so
+	// its own dimensions are the natural (non-upscaled) output size. Blur-pad
+	// keeps the whole frame, so the source's own long edge is the reference.
+	const sourceLongEdge =
+		mode === 'crop' ? Math.max(crop.width, crop.height) : Math.max(sourceWidth, sourceHeight);
+	return outputDimensions(ratio, sourceLongEdge);
 }
 
 export function buildExportArgs(
@@ -111,8 +133,18 @@ export function buildExportArgs(
 	outputName: string,
 	options: ExportOptions
 ): string[] {
-	const { mode, speed, ratio, crop, compression, sourceDurationSeconds, sourceWidth, sourceHeight } =
-		options;
+	const {
+		mode,
+		speed,
+		ratio,
+		crop,
+		compression,
+		sourceDurationSeconds,
+		sourceWidth,
+		sourceHeight,
+		captionsAssPath,
+		captionsFontsDir
+	} = options;
 
 	const needsSpeedFilters = speed !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
@@ -121,12 +153,20 @@ export function buildExportArgs(
 	const needsAudioReencode = needsSpeedFilters || compression.mode === 'size';
 	const extraPipelines = (mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0);
 
-	// Crop mode: the crop region is already sized to the target ratio, so
-	// its own dimensions are the natural (non-upscaled) output size. Blur-pad
-	// keeps the whole frame, so the source's own long edge is the reference.
-	const sourceLongEdge =
-		mode === 'crop' ? Math.max(crop.width, crop.height) : Math.max(sourceWidth, sourceHeight);
-	const { width: outW, height: outH } = outputDimensions(ratio, sourceLongEdge);
+	// Confirmed the `ass` filter alone (plain crop, no other concurrent
+	// pipeline) does not trigger the pthread-pool deadlock described above —
+	// exec resolved quickly against a real MP4 output. Not yet verified in
+	// combination with blur-pad + speed + captions all at once; if that
+	// combo hangs, treat captions as another `extraPipelines` contributor.
+	const captionsSuffix = captionsAssPath ? `,ass=${captionsAssPath}:fontsdir=${captionsFontsDir}` : '';
+
+	const { width: outW, height: outH } = computeOutputDimensions({
+		mode,
+		ratio,
+		crop,
+		sourceWidth,
+		sourceHeight
+	});
 
 	const args = ['-i', inputName];
 	if (mode === 'blur-pad') args.push('-i', inputName);
@@ -138,7 +178,7 @@ export function buildExportArgs(
 		// scaled only if it exceeds the output cap — never upscaled.
 		args.push(
 			'-vf',
-			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}`
+			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}${captionsSuffix}`
 		);
 	} else {
 		// -threads only caps the encoder; -filter_complex's own thread pool
@@ -148,7 +188,7 @@ export function buildExportArgs(
 			'-filter_complex_threads',
 			'1',
 			'-filter_complex',
-			`[0:v]scale=${outW}:${outH},boxblur=20:5[bg];[1:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1${speedSuffix}[outv]`,
+			`[0:v]scale=${outW}:${outH},boxblur=20:5[bg];[1:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1${speedSuffix}${captionsSuffix}[outv]`,
 			'-map',
 			'[outv]',
 			'-map',

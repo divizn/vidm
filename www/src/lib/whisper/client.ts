@@ -1,5 +1,5 @@
-import { FileTranscriber } from '@transcribe/transcriber';
-import type { CaptionSegment } from './srt';
+import { FileTranscriber, type TranscribeToken } from '@transcribe/transcriber';
+import type { CaptionSegment, CaptionWord } from './srt';
 
 // Self-hosted, same COOP/COEP setup as ffmpeg-core-mt (see vite.config.ts).
 // Loaded via dynamic import of the absolute static URL (not a bare package
@@ -14,6 +14,34 @@ import type { CaptionSegment } from './srt';
 // the source of the crash this file used to work around with diagnostics.
 const SHOUT_URL = '/whisper/shout.wasm.js';
 const MODEL_URL = '/whisper/ggml-tiny.en-q5_1.bin';
+
+// whisper.cpp's BPE tokenizer prefixes a token with a space to mark the
+// start of a new word; a token with no leading space is a continuation
+// (subword or trailing punctuation) that belongs to the previous word. Also
+// drop bracketed special tokens (e.g. "[_BEGIN_]") which carry no timing
+// worth exposing. Word timestamps require `token_timestamps: true`
+// (the library default), so `offsets` should always be present here.
+function wordsFromTokens(tokens: TranscribeToken[]): CaptionWord[] {
+	const words: CaptionWord[] = [];
+	for (const token of tokens) {
+		if (!token.offsets) continue;
+		if (/^\[.*\]$/.test(token.text.trim())) continue;
+		const text = token.text.trim();
+		if (!text) continue;
+
+		const from = token.offsets.from / 1000;
+		const to = token.offsets.to / 1000;
+		const isContinuation = !token.text.startsWith(' ') && words.length > 0;
+		if (isContinuation) {
+			const prev = words[words.length - 1];
+			prev.text += text;
+			prev.to = to;
+		} else {
+			words.push({ text, from, to });
+		}
+	}
+	return words;
+}
 
 export async function transcribeFile(
 	file: File,
@@ -38,6 +66,7 @@ export async function transcribeFile(
 	return result.transcription.map((seg) => ({
 		from: seg.timestamps.from,
 		to: seg.timestamps.to,
-		text: seg.text
+		text: seg.text,
+		words: wordsFromTokens(seg.tokens)
 	}));
 }
