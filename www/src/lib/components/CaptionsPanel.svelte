@@ -114,7 +114,7 @@
 			</div>
 			{#if burnIn}
 				<CaptionStyleControl bind:style />
-				<CaptionPreview {file} {segments} {style} />
+				<CaptionPreview {segments} {style} />
 			{/if}
 		{/if}
 	</CardContent>
