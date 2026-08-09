@@ -62,23 +62,31 @@ function clampWordsToSegment(seg: CaptionSegment, segStart: number, segEnd: numb
 function buildSegmentDialogues(
 	seg: CaptionSegment,
 	baseColor: string,
-	highlightColor: string
+	highlightColor: string,
+	speed: number
 ): string[] {
 	const segStart = parseSrtTimestamp(seg.from);
 	const segEnd = parseSrtTimestamp(seg.to);
 	if (segEnd <= segStart) return [];
 
+	// Dialogue windows are computed in the source's original time base
+	// (matching word/segment timestamps from transcription), then scaled
+	// down here — `setpts=PTS/speed` compresses the exported video's
+	// timeline by the same factor, so burned-in captions must scale to
+	// match or they'd drift out of sync as speed diverges from 1x.
+	const scale = (t: number) => t / speed;
+
 	const plainSegmentText = escapeAssText(seg.text.trim());
 	const clamped = clampWordsToSegment(seg, segStart, segEnd);
 	if (clamped.length === 0) {
-		return [dialogueLine(segStart, segEnd, plainSegmentText)];
+		return [dialogueLine(scale(segStart), scale(segEnd), plainSegmentText)];
 	}
 
 	const lines: string[] = [];
 
 	if (clamped[0].from > segStart + 0.01) {
 		const plainWords = clamped.map((w) => escapeAssText(w.text)).join(' ');
-		lines.push(dialogueLine(segStart, clamped[0].from, plainWords));
+		lines.push(dialogueLine(scale(segStart), scale(clamped[0].from), plainWords));
 	}
 
 	for (let i = 0; i < clamped.length; i++) {
@@ -92,7 +100,7 @@ function buildSegmentDialogues(
 					: escapeAssText(w.text)
 			)
 			.join(' ');
-		lines.push(dialogueLine(start, end, text));
+		lines.push(dialogueLine(scale(start), scale(end), text));
 	}
 
 	return lines;
@@ -158,7 +166,8 @@ export function buildAssSubtitle(
 	segments: CaptionSegment[],
 	style: CaptionStyle,
 	width: number,
-	height: number
+	height: number,
+	speed: number = 1
 ): string {
 	const fontSize = Math.round((style.fontSizePercent / 100) * height);
 	const outline = Math.max(2, Math.round(fontSize * 0.06));
@@ -180,6 +189,8 @@ export function buildAssSubtitle(
 		`[Events]\n` +
 		`Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n`;
 
-	const events = segments.flatMap((seg) => buildSegmentDialogues(seg, baseColor, highlightColor));
+	const events = segments.flatMap((seg) =>
+		buildSegmentDialogues(seg, baseColor, highlightColor, speed)
+	);
 	return header + events.join('\n') + '\n';
 }
