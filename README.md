@@ -3,11 +3,12 @@
 ![CI](https://github.com/divizn/vidm/actions/workflows/ci.yml/badge.svg)
 ![Deploy](https://github.com/divizn/vidm/actions/workflows/deploy.yml/badge.svg)
 
-A browser-based tool that reformats landscape video into short-form
-portrait video (9:16) with auto-generated, styled captions burned in.
-Runs entirely client-side (ffmpeg.wasm + whisper.wasm) — no video is
-uploaded to a server. Offline PWA support is the long-term goal, not
-yet built (see Status).
+A browser-based, lightweight video editor: reformat to portrait (or
+another ratio), adjust speed, compress, and auto-generate styled,
+burned-in captions — each an independent, optional tool. Runs entirely
+client-side (ffmpeg.wasm + whisper.wasm) — no video is uploaded to a
+server. Offline PWA support is the long-term goal, not yet built (see
+Status).
 
 ## Repo layout
 
@@ -58,17 +59,22 @@ current status.
 
 ## Status
 
-- **Reformat (done)**: upload a video, reformat to portrait 9:16 (also
-  1:1/4:5/16:9) via center-crop or blur-padded fill, preview, download.
+- **Reformat (done, optional)**: reformat to portrait 9:16 (also
+  1:1/4:5/16:9) via center-crop or blur-padded fill, or skip reformatting
+  entirely ("no reformat" keeps the source frame). Preview, download.
   Playback speed control (0.5x–2x). Compression: quality preset, target
-  file size, custom CRF, or none.
-- **Auto-captions (partial)**: whisper.cpp compiled to WASM, self-hosted,
+  file size, custom CRF, or none. Every tool is independently optional;
+  at least one must be active to export.
+- **Auto-captions (done)**: whisper.cpp compiled to WASM, self-hosted,
   transcribes audio client-side — no server, no third-party API. Captions
   are editable per-segment, there's a read-only transcript view, and you
-  can download the transcript as `.srt`. Captions are **not** yet burned
-  into the exported video — that's FFmpeg subtitle/drawtext filter work,
-  tracked on `feat/caption-burn-in`, not started.
-- **Caption styling & burn-in**: not started.
+  can download the transcript as `.srt`.
+- **Caption styling & burn-in (done)**: font, position, and color
+  controls; captions burn into the exported video via FFmpeg's `ass`
+  (libass) filter, with word-by-word karaoke-style highlight timed from
+  whisper's token timestamps. A live CSS preview shows the exact same
+  text/timing before you export, no ffmpeg run needed to check a style
+  change.
 - **Offline PWA**: not started. No service worker yet — the app does
   *not* currently work offline. OPFS storage and the ffmpeg-core/whisper
   asset caching strategy are still to come.

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildAssSubtitle,
 	escapeAssText,
+	getActiveCaption,
 	hexToAssColor,
 	parseSrtTimestamp,
 	toAssTimestamp
@@ -116,5 +117,57 @@ describe('buildAssSubtitle', () => {
 		];
 		const ass = buildAssSubtitle(segments, DEFAULT_CAPTION_STYLE, 1080, 1920);
 		expect(ass).not.toContain('Bad.');
+	});
+});
+
+describe('getActiveCaption', () => {
+	const withWords: CaptionSegment[] = [
+		{
+			from: '00:00:00,000',
+			to: '00:00:02,000',
+			text: 'Hello world',
+			words: [
+				{ text: 'Hello', from: 0, to: 0.5 },
+				{ text: 'world', from: 0.5, to: 1 }
+			]
+		}
+	];
+
+	it('returns null outside any segment', () => {
+		expect(getActiveCaption(withWords, 5)).toBeNull();
+	});
+
+	it('highlights the word whose window contains the current time', () => {
+		expect(getActiveCaption(withWords, 0.2)).toEqual([
+			{ text: 'Hello', highlighted: true },
+			{ text: 'world', highlighted: false }
+		]);
+		// Second word's window runs from its own start (0.5) to the segment
+		// end (2), matching buildAssSubtitle's dialogue windowing exactly.
+		expect(getActiveCaption(withWords, 1.9)).toEqual([
+			{ text: 'Hello', highlighted: false },
+			{ text: 'world', highlighted: true }
+		]);
+	});
+
+	it('highlights nothing before the first word starts', () => {
+		const segments: CaptionSegment[] = [
+			{
+				from: '00:00:00,000',
+				to: '00:00:02,000',
+				text: 'Hello world',
+				words: [{ text: 'Hello', from: 0.5, to: 1 }]
+			}
+		];
+		expect(getActiveCaption(segments, 0.1)).toEqual([{ text: 'Hello', highlighted: false }]);
+	});
+
+	it('returns plain (non-highlighted) text when there is no word timing', () => {
+		const segments: CaptionSegment[] = [
+			{ from: '00:00:00,000', to: '00:00:02,000', text: 'Hello world' }
+		];
+		expect(getActiveCaption(segments, 1)).toEqual([
+			{ text: 'Hello world', highlighted: false }
+		]);
 	});
 });

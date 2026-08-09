@@ -3,6 +3,22 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* Same self-hosted fonts used for caption burn-in (www/static/fonts/) — the
+   family names here must match CAPTION_FONTS' assFamily in
+   $lib/captions/style.ts so the live preview and the burned-in ASS output
+   render the same typeface. */
+@font-face {
+	font-family: 'Anton';
+	src: url('/fonts/Anton-Regular.ttf') format('truetype');
+	font-display: swap;
+}
+@font-face {
+	font-family: 'Poppins';
+	src: url('/fonts/Poppins-Bold.ttf') format('truetype');
+	font-weight: 700;
+	font-display: swap;
+}
+
 :root {
 	--radius: 0.625rem;
 	--background: oklch(0.99 0.002 60);

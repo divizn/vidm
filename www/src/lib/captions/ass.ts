@@ -1,4 +1,4 @@
-import type { CaptionSegment } from '$lib/whisper/srt';
+import type { CaptionSegment, CaptionWord } from '$lib/whisper/srt';
 import type { CaptionStyle, CaptionPosition } from './style';
 
 // hh:mm:ss,sss (SRT) -> seconds.
@@ -41,6 +41,19 @@ function dialogueLine(start: number, end: number, text: string): string {
 	return `Dialogue: 0,${toAssTimestamp(start)},${toAssTimestamp(end)},Default,,0,0,0,,${text}`;
 }
 
+// Word timing is independent of segment timing (different source: token
+// offsets vs. segment offsets), so it can drift slightly outside the
+// segment's own bounds — clamp to the segment and drop anything that
+// collapses to zero (or negative) duration once clamped. Shared by both
+// the ASS burn-in export and the live preview overlay so they agree on
+// which word is "active" at a given time.
+function clampWordsToSegment(seg: CaptionSegment, segStart: number, segEnd: number): CaptionWord[] {
+	if (!seg.words) return [];
+	return seg.words
+		.map((w) => ({ text: w.text, from: Math.max(w.from, segStart), to: Math.min(w.to, segEnd) }))
+		.filter((w) => w.to > w.from);
+}
+
 // Word-level highlight: one dialogue event per word, spanning from that
 // word's own start to the next word's start (or segment end for the last
 // word) — this keeps the caption continuously visible for the whole
@@ -56,14 +69,7 @@ function buildSegmentDialogues(
 	if (segEnd <= segStart) return [];
 
 	const plainSegmentText = escapeAssText(seg.text.trim());
-	const words = seg.words;
-	if (!words || words.length === 0) {
-		return [dialogueLine(segStart, segEnd, plainSegmentText)];
-	}
-
-	const clamped = words
-		.map((w) => ({ text: w.text, from: Math.max(w.from, segStart), to: Math.min(w.to, segEnd) }))
-		.filter((w) => w.to > w.from);
+	const clamped = clampWordsToSegment(seg, segStart, segEnd);
 	if (clamped.length === 0) {
 		return [dialogueLine(segStart, segEnd, plainSegmentText)];
 	}
@@ -90,6 +96,42 @@ function buildSegmentDialogues(
 	}
 
 	return lines;
+}
+
+export interface ActiveCaptionWord {
+	text: string;
+	highlighted: boolean;
+}
+
+// Live-preview counterpart to buildAssSubtitle: given the current playback
+// time, resolves which words (if any) should be showing and which one (if
+// any) is "active" — using the exact same windowing as the ASS export
+// (clampWordsToSegment + "active until the next word starts") so the
+// preview and the actual burn-in never disagree. Returns null when no
+// segment covers `time` (nothing shows, matching the real burn-in).
+export function getActiveCaption(segments: CaptionSegment[], time: number): ActiveCaptionWord[] | null {
+	const seg = segments.find(
+		(s) => time >= parseSrtTimestamp(s.from) && time < parseSrtTimestamp(s.to)
+	);
+	if (!seg) return null;
+
+	const segStart = parseSrtTimestamp(seg.from);
+	const segEnd = parseSrtTimestamp(seg.to);
+	const clamped = clampWordsToSegment(seg, segStart, segEnd);
+	if (clamped.length === 0) {
+		return [{ text: seg.text.trim(), highlighted: false }];
+	}
+
+	if (time < clamped[0].from) {
+		return clamped.map((w) => ({ text: w.text, highlighted: false }));
+	}
+
+	let activeIndex = 0;
+	for (let i = 0; i < clamped.length; i++) {
+		if (clamped[i].from <= time) activeIndex = i;
+	}
+
+	return clamped.map((w, i) => ({ text: w.text, highlighted: i === activeIndex }));
 }
 
 // Builds a full .ass subtitle document for burn-in via FFmpeg's `ass`

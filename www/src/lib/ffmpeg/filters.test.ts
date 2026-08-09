@@ -3,6 +3,7 @@ import {
 	ASPECT_RATIOS,
 	DEFAULT_COMPRESSION,
 	buildExportArgs,
+	computeOutputDimensions,
 	outputDimensions,
 	type CropRegion,
 	type ExportOptions
@@ -191,5 +192,63 @@ describe('buildExportArgs', () => {
 	it('adds no -threads cap for a plain crop at 1x with no size-mode compression', () => {
 		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
 		expect(args).not.toContain('-threads');
+	});
+
+	describe('mode "none" (no reformat)', () => {
+		it('copies the video stream untouched when no other option is active either', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ mode: 'none', compression: { mode: 'none', crf: 23, targetMB: 10 } })
+			);
+
+			expect(args).not.toContain('-vf');
+			expect(args).toContain('-c:v');
+			expect(args[args.indexOf('-c:v') + 1]).toBe('copy');
+		});
+
+		it('still applies speed/captions/compression when active, keeping the source frame size', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ mode: 'none', speed: 1.5 })
+			);
+
+			expect(args).not.toContain('-c:v');
+			const vf = args[args.indexOf('-vf') + 1];
+			expect(vf).toContain('setpts=PTS/1.5');
+			expect(vf).toContain(`scale=1920:1080`); // source dims, not a target ratio's
+			expect(vf).not.toContain('crop=');
+		});
+
+		it('wires the ass filter in without a crop/scale-to-ratio step', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({
+					mode: 'none',
+					captionsAssPath: 'captions.ass',
+					captionsFontsDir: 'fonts'
+				})
+			);
+
+			const vf = args[args.indexOf('-vf') + 1];
+			expect(vf).toContain('ass=captions.ass:fontsdir=fonts');
+			expect(vf).not.toContain('crop=');
+		});
+	});
+});
+
+describe('computeOutputDimensions with mode "none"', () => {
+	it('returns the source dimensions, rounded to even, ignoring ratio/crop entirely', () => {
+		const { width, height } = computeOutputDimensions({
+			mode: 'none',
+			ratio: RATIO_9_16,
+			crop: CROP,
+			sourceWidth: 1281,
+			sourceHeight: 721
+		});
+		expect(width).toBe(1280);
+		expect(height).toBe(720);
 	});
 });

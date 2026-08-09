@@ -1,4 +1,4 @@
-export type ReformatMode = 'crop' | 'blur-pad';
+export type ReformatMode = 'crop' | 'blur-pad' | 'none';
 
 export interface AspectRatio {
 	label: string;
@@ -120,6 +120,12 @@ export function computeOutputDimensions(
 	options: Pick<ExportOptions, 'mode' | 'ratio' | 'crop' | 'sourceWidth' | 'sourceHeight'>
 ): { width: number; height: number } {
 	const { mode, ratio, crop, sourceWidth, sourceHeight } = options;
+	// 'none': no reformat at all — keep the source's own frame size
+	// (rounded to even, needed only if some other option still forces a
+	// re-encode; see buildExportArgs). No ratio/crop-driven resizing.
+	if (mode === 'none') {
+		return { width: toEven(sourceWidth), height: toEven(sourceHeight) };
+	}
 	// Crop mode: the crop region is already sized to the target ratio, so
 	// its own dimensions are the natural (non-upscaled) output size. Blur-pad
 	// keeps the whole frame, so the source's own long edge is the reference.
@@ -180,7 +186,7 @@ export function buildExportArgs(
 			'-vf',
 			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}${captionsSuffix}`
 		);
-	} else {
+	} else if (mode === 'blur-pad') {
 		// -threads only caps the encoder; -filter_complex's own thread pool
 		// (scale/boxblur/overlay each may spawn workers) is separate and can
 		// exhaust the shared WASM pthread pool on its own — cap both.
@@ -194,6 +200,26 @@ export function buildExportArgs(
 			'-map',
 			'0:a'
 		);
+	} else {
+		// 'none': keep the source frame as-is — no crop/pad/target-ratio
+		// scale. Other options (speed/captions/compression) still apply and
+		// still force a re-encode when active; when none of them are active
+		// either, skip -vf entirely and copy the video stream untouched
+		// rather than pointlessly re-encoding a pixel-identical frame.
+		const filters: string[] = [];
+		if (needsSpeedFilters || captionsAssPath || compression.mode !== 'none') {
+			// Even-dimension safety net for the (rare) odd-dimensioned source —
+			// libx264/yuv420p requires even width/height. No-op scale otherwise.
+			filters.push(`scale=${outW}:${outH}`, 'setsar=1');
+		}
+		if (needsSpeedFilters) filters.push(`setpts=PTS/${speed}`);
+		if (captionsAssPath) filters.push(`ass=${captionsAssPath}:fontsdir=${captionsFontsDir}`);
+
+		if (filters.length > 0) {
+			args.push('-vf', filters.join(','));
+		} else {
+			args.push('-c:v', 'copy');
+		}
 	}
 
 	if (needsAudioReencode) {
@@ -219,9 +245,11 @@ export function buildExportArgs(
 	} else if (compression.mode !== 'none') {
 		args.push('-crf', String(compression.crf));
 	}
-	// mode === 'none': no explicit -crf/-b:v — the reformat filters still force
-	// a re-encode (there's no -c:v copy path here), but libx264 picks its own
-	// default (unset CRF, effectively 23) instead of an app-chosen target.
+	// compression.mode === 'none': no explicit -crf/-b:v. If some other
+	// filter still forces a re-encode, libx264 picks its own default (unset
+	// CRF, effectively 23) instead of an app-chosen target. The 'none'
+	// reformat mode's -c:v copy path above is only reachable when
+	// compression.mode is 'none' too, so it never conflicts with -crf/-b:v.
 
 	if (extraPipelines > 0) {
 		args.push(
