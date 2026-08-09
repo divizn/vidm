@@ -30,7 +30,7 @@
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
 	let errorMessage = $state('');
-	let mode = $state<ReformatMode>('crop');
+	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
 	let speed = $state(1);
 	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION });
@@ -137,10 +137,10 @@
 <main class="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
 	<div class="flex items-start justify-between gap-4">
 		<div class="space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">vidm — portrait reformatter</h1>
+			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
 			<p class="text-muted-foreground text-sm">
-				Upload a landscape video, reformat it, preview, and download. Runs entirely in your
-				browser.
+				Upload a video, then reformat, adjust speed, compress, and caption it — each one
+				optional. Runs entirely in your browser.
 			</p>
 		</div>
 		<ThemeToggle />
