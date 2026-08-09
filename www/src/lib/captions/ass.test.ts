@@ -190,4 +190,12 @@ describe('advancePreviewTime', () => {
 	it('returns 0 for an empty segments array', () => {
 		expect(advancePreviewTime(5, 1, [])).toBe(0);
 	});
+
+	it('wraps when next lands exactly on the last segment end', () => {
+		expect(advancePreviewTime(3.5, 0.5, segments)).toBe(1);
+	});
+
+	it('wraps correctly with a single-segment array', () => {
+		expect(advancePreviewTime(1.9, 0.2, [segments[0]])).toBe(1);
+	});
 });

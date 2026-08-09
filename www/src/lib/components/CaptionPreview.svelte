@@ -15,7 +15,16 @@
 	// listener. `segments` is read fresh on every tick via the reactive prop
 	// (not a snapshot captured at effect-start), so editing caption text
 	// mid-preview stays in sync without restarting the loop.
+	//
+	// Checked once (not reactively) — there's no scrubbing/pause control by
+	// design, so a user with prefers-reduced-motion set just gets the preview
+	// parked on the first segment's start instead of looping indefinitely.
+	const prefersReducedMotion =
+		typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 	$effect(() => {
+		if (prefersReducedMotion) return;
+
 		let rafId: number;
 		let lastTimestamp: number | undefined;
 
@@ -34,7 +43,7 @@
 </script>
 
 <div
-	class="relative mx-auto flex max-w-[420px] items-center justify-center rounded-md bg-black"
+	class="relative mx-auto max-w-[420px] overflow-hidden rounded-md bg-black"
 	style:height={`${PREVIEW_HEIGHT_PX}px`}
 >
 	<CaptionOverlay
