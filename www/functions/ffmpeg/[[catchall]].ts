@@ -15,6 +15,7 @@ export const onRequestGet: PagesFunction<Env> = async (ctx) => {
 
 	const headers = new Headers();
 	object.writeHttpMetadata(headers);
+	headers.set('content-type', 'application/wasm');
 	headers.set('etag', object.httpEtag);
 
 	return new Response(object.body, { headers });
