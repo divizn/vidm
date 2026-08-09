@@ -19,6 +19,7 @@
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
 
@@ -93,12 +94,15 @@
 </script>
 
 <main class="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
-	<div class="space-y-1">
-		<h1 class="text-2xl font-bold tracking-tight">vidm — portrait reformatter</h1>
-		<p class="text-muted-foreground text-sm">
-			Upload a landscape video, reformat it, preview, and download. Runs entirely in your
-			browser.
-		</p>
+	<div class="flex items-start justify-between gap-4">
+		<div class="space-y-1">
+			<h1 class="text-2xl font-bold tracking-tight">vidm — portrait reformatter</h1>
+			<p class="text-muted-foreground text-sm">
+				Upload a landscape video, reformat it, preview, and download. Runs entirely in your
+				browser.
+			</p>
+		</div>
+		<ThemeToggle />
 	</div>
 
 	{#if status === 'configuring' && !sourceFile}

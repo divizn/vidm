@@ -25,6 +25,11 @@
 		sourceHeight = videoEl.videoHeight;
 		renderedWidth = videoEl.clientWidth;
 		renderedHeight = videoEl.clientHeight;
+		// Some browsers (notably Firefox) never paint a frame for a paused,
+		// non-autoplaying <video> until something actually requests one — a
+		// negligible forced seek triggers the decode+paint without visibly
+		// scrubbing, so the preview shows real content instead of black.
+		videoEl.currentTime = 0.001;
 	}
 
 	// Largest box with the target ratio that fits inside the source frame,
@@ -104,7 +109,7 @@
 	></video>
 	{#if sourceWidth}
 		<div
-			class="absolute cursor-grab touch-none border-2 border-blue-500 bg-blue-500/15 active:cursor-grabbing"
+			class="border-primary bg-primary/20 absolute cursor-grab touch-none border-2 active:cursor-grabbing"
 			style:width={`${boxFrac.w * 100}%`}
 			style:height={`${boxFrac.h * 100}%`}
 			style:left={`${offsetXFrac * (1 - boxFrac.w) * 100}%`}
