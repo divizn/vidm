@@ -1,6 +1,7 @@
 # vidm
 
 ![CI](https://github.com/divizn/vidm/actions/workflows/ci.yml/badge.svg)
+![Deploy](https://github.com/divizn/vidm/actions/workflows/deploy.yml/badge.svg)
 
 A browser-based tool that reformats landscape video into short-form
 portrait video (9:16) with auto-generated, styled captions burned in.
