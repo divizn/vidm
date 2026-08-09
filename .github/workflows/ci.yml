@@ -36,6 +36,14 @@ jobs:
 
       - run: pnpm build
 
+      # deploy re-uses this build output instead of rebuilding from scratch
+      # (see deploy job) — same install, same source, no reason to redo it.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build
+          path: www/build
+          retention-days: 1
+
   deploy:
     needs: test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -60,7 +68,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm build
+      # Reuses the build `test` already produced from the same commit
+      # instead of rebuilding — `test` is a required dependency (needs:
+      # test) so this artifact always exists by the time deploy runs.
+      - uses: actions/download-artifact@v4
+        with:
+          name: build
+          path: www/build
 
       # ffmpeg-core.wasm and the whisper model are large (tens of MB) and
       # almost never change — re-uploading them to R2 on every deploy costs
