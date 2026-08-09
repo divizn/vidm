@@ -41,6 +41,14 @@ function dialogueLine(start: number, end: number, text: string): string {
 	return `Dialogue: 0,${toAssTimestamp(start)},${toAssTimestamp(end)},Default,,0,0,0,,${text}`;
 }
 
+// Segment/word timestamps are on the transcript's original timeline, but
+// `setpts=PTS/speed` retimes the video's own timeline by the same factor —
+// dividing here keeps burned-in captions aligned with the sped-up/slowed
+// video instead of drifting by exactly the speed factor.
+function toOutputTime(seconds: number, speed: number): number {
+	return seconds / speed;
+}
+
 // Word timing is independent of segment timing (different source: token
 // offsets vs. segment offsets), so it can drift slightly outside the
 // segment's own bounds — clamp to the segment and drop anything that
@@ -69,24 +77,19 @@ function buildSegmentDialogues(
 	const segEnd = parseSrtTimestamp(seg.to);
 	if (segEnd <= segStart) return [];
 
-	// Dialogue windows are computed in the source's original time base
-	// (matching word/segment timestamps from transcription), then scaled
-	// down here — `setpts=PTS/speed` compresses the exported video's
-	// timeline by the same factor, so burned-in captions must scale to
-	// match or they'd drift out of sync as speed diverges from 1x.
-	const scale = (t: number) => t / speed;
-
 	const plainSegmentText = escapeAssText(seg.text.trim());
 	const clamped = clampWordsToSegment(seg, segStart, segEnd);
 	if (clamped.length === 0) {
-		return [dialogueLine(scale(segStart), scale(segEnd), plainSegmentText)];
+		return [dialogueLine(toOutputTime(segStart, speed), toOutputTime(segEnd, speed), plainSegmentText)];
 	}
 
 	const lines: string[] = [];
 
 	if (clamped[0].from > segStart + 0.01) {
 		const plainWords = clamped.map((w) => escapeAssText(w.text)).join(' ');
-		lines.push(dialogueLine(scale(segStart), scale(clamped[0].from), plainWords));
+		lines.push(
+			dialogueLine(toOutputTime(segStart, speed), toOutputTime(clamped[0].from, speed), plainWords)
+		);
 	}
 
 	for (let i = 0; i < clamped.length; i++) {
@@ -100,7 +103,7 @@ function buildSegmentDialogues(
 					: escapeAssText(w.text)
 			)
 			.join(' ');
-		lines.push(dialogueLine(scale(start), scale(end), text));
+		lines.push(dialogueLine(toOutputTime(start, speed), toOutputTime(end, speed), text));
 	}
 
 	return lines;
@@ -162,6 +165,10 @@ export function advancePreviewTime(
 // Builds a full .ass subtitle document for burn-in via FFmpeg's `ass`
 // filter. width/height must match the output frame size exactly (PlayResX/
 // PlayResY) so libass doesn't apply its own auto-scaling on top of ours.
+// `speed` must match the export's playback-speed setting — the `ass` filter
+// burns in against the video's already-retimed (`setpts=PTS/speed`) PTS, so
+// dialogue timestamps built from the original transcript need the same
+// scaling or they drift out of sync with the sped-up/slowed video.
 export function buildAssSubtitle(
 	segments: CaptionSegment[],
 	style: CaptionStyle,

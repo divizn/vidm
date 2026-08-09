@@ -119,6 +119,46 @@ describe('buildAssSubtitle', () => {
 		const ass = buildAssSubtitle(segments, DEFAULT_CAPTION_STYLE, 1080, 1920);
 		expect(ass).not.toContain('Bad.');
 	});
+
+	it('defaults to no timestamp scaling when speed is omitted', () => {
+		const segments: CaptionSegment[] = [
+			{ from: '00:00:00,000', to: '00:00:02,000', text: 'Hello.' }
+		];
+		const ass = buildAssSubtitle(segments, DEFAULT_CAPTION_STYLE, 1080, 1920);
+		const dialogues = ass.split('\n').filter((line) => line.startsWith('Dialogue:'));
+		expect(dialogues[0]).toContain(`${toAssTimestamp(0)},${toAssTimestamp(2)}`);
+	});
+
+	it('scales dialogue timestamps to match the video\'s setpts=PTS/speed retiming', () => {
+		const segments: CaptionSegment[] = [
+			{ from: '00:00:00,000', to: '00:00:02,000', text: 'Hello.' }
+		];
+		// speed=2 halves output duration (setpts=PTS/2), so a caption that
+		// spanned source seconds 0-2 must burn in at output seconds 0-1.
+		const ass = buildAssSubtitle(segments, DEFAULT_CAPTION_STYLE, 1080, 1920, 2);
+		const dialogues = ass.split('\n').filter((line) => line.startsWith('Dialogue:'));
+		expect(dialogues[0]).toContain(`${toAssTimestamp(0)},${toAssTimestamp(1)}`);
+	});
+
+	it('scales word-level dialogue windows by speed too', () => {
+		const segments: CaptionSegment[] = [
+			{
+				from: '00:00:00,000',
+				to: '00:00:02,000',
+				text: 'Hello world',
+				words: [
+					{ text: 'Hello', from: 0, to: 0.5 },
+					{ text: 'world', from: 0.5, to: 1 }
+				]
+			}
+		];
+		// speed=0.5 doubles output duration (setpts=PTS/0.5), so each word's
+		// window must double too.
+		const ass = buildAssSubtitle(segments, DEFAULT_CAPTION_STYLE, 1080, 1920, 0.5);
+		const dialogues = ass.split('\n').filter((line) => line.startsWith('Dialogue:'));
+		expect(dialogues[0]).toContain(`${toAssTimestamp(0)},${toAssTimestamp(1)}`);
+		expect(dialogues[1]).toContain(`${toAssTimestamp(1)},${toAssTimestamp(4)}`);
+	});
 });
 
 describe('getActiveCaption', () => {
