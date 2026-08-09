@@ -1,5 +1,6 @@
 import { sveltekit } from '@sveltejs/kit/vite';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
+import type { Plugin } from 'vite';
 
 // Required for the multi-threaded ffmpeg-core (SharedArrayBuffer). The
 // static-hosted production build will need these same headers set at the
@@ -33,5 +34,10 @@ export default defineConfig({
 	optimizeDeps: {
 		// Pre-bundling breaks @ffmpeg/ffmpeg's internal Web Worker loading.
 		exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util']
+	},
+	test: {
+		// Unit tests only cover pure logic (filters.ts, srt.ts) — no DOM,
+		// no browser/WASM needed, so the default node environment is enough.
+		include: ['src/**/*.test.ts']
 	}
 });
