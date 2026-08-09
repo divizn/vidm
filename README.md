@@ -52,7 +52,7 @@ and push to main — `main` is branch-protected on them passing.
 ## Deployment
 
 `.github/workflows/deploy.yml` builds `www/` and deploys it to
-Cloudflare Pages (project `vidm`) via `wrangler pages deploy` on every
+Cloudflare Workers (project `vidm`) via `wrangler deploy` on every
 push to `main`. Requires `CLOUDFLARE_API_TOKEN` and
 `CLOUDFLARE_ACCOUNT_ID` repo secrets. See the Deploy badge above for
 current status.
@@ -80,5 +80,5 @@ current status.
   asset caching strategy are still to come.
 - **UI**: redesigned on shadcn-svelte + Tailwind v4, with a manual
   dark/light theme toggle (defaults to system preference, persisted).
-- **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Pages),
+- **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Workers),
   see [Deployment](#deployment) and the badge above for current status.

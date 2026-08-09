@@ -1,7 +1,12 @@
 {
 	"$schema": "./node_modules/wrangler/config-schema.json",
 	"name": "vidm",
-	"pages_build_output_dir": "./build",
-	"compatibility_date": "2026-08-09",
+	"main": "./worker.ts",
+	"compatibility_date": "2026-08-08",
+	"assets": {
+		"directory": "./build",
+		"binding": "ASSETS",
+		"not_found_handling": "single-page-application"
+	},
 	"r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "vidm-assets" }]
 }
