@@ -30,6 +30,21 @@ jobs:
 
       - run: pnpm build
 
+      # ffmpeg-core.wasm and the whisper model exceed Cloudflare Pages'
+      # 25 MiB static-asset limit — deployed to R2 instead (see
+      # functions/ffmpeg and functions/whisper) and stripped from the
+      # static output here so the Pages upload doesn't reject the deploy.
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: www
+          command: |
+            r2 object put vidm-assets/ffmpeg-core.wasm --file=static/ffmpeg/ffmpeg-core.wasm --content-type=application/wasm --cache-control="public, max-age=31536000, immutable" --remote
+            r2 object put vidm-assets/ggml-tiny.en-q5_1.bin --file=static/whisper/ggml-tiny.en-q5_1.bin --content-type=application/octet-stream --cache-control="public, max-age=31536000, immutable" --remote
+
+      - run: rm -f build/ffmpeg/ffmpeg-core.wasm build/whisper/ggml-tiny.en-q5_1.bin
+
       - uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
