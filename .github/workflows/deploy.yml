@@ -40,8 +40,8 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: www
           command: |
-            r2 object put vidm-assets/ffmpeg-core.wasm --file=static/ffmpeg/ffmpeg-core.wasm --content-type=application/wasm --cache-control="public, max-age=31536000, immutable" --remote
-            r2 object put vidm-assets/ggml-tiny.en-q5_1.bin --file=static/whisper/ggml-tiny.en-q5_1.bin --content-type=application/octet-stream --cache-control="public, max-age=31536000, immutable" --remote
+            r2 object put vidm-assets/ffmpeg-core.wasm --file=static/ffmpeg/ffmpeg-core.wasm --content-type=application/wasm --cache-control=public,max-age=31536000,immutable
+            r2 object put vidm-assets/ggml-tiny.en-q5_1.bin --file=static/whisper/ggml-tiny.en-q5_1.bin --content-type=application/octet-stream --cache-control=public,max-age=31536000,immutable
 
       - run: rm -f build/ffmpeg/ffmpeg-core.wasm build/whisper/ggml-tiny.en-q5_1.bin
 
