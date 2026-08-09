@@ -8,5 +8,8 @@
 		"binding": "ASSETS",
 		"not_found_handling": "single-page-application"
 	},
+	"routes": [{ "pattern": "vidm.phons.dev", "custom_domain": true }],
+	"workers_dev": true,
+	"preview_urls": true,
 	"r2_buckets": [{ "binding": "ASSETS_BUCKET", "bucket_name": "vidm-assets" }]
 }
