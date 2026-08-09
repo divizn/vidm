@@ -1,6 +1,8 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { fetchFile } from '@ffmpeg/util';
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
+	import { exportResult } from '$lib/export-state.svelte';
 	import {
 		buildExportArgs,
 		computeOutputDimensions,
@@ -20,7 +22,6 @@
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CropPositioner from '$lib/components/CropPositioner.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
-	import VideoPreview from '$lib/components/VideoPreview.svelte';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
@@ -38,7 +39,6 @@
 	let sourceDuration = $state(0);
 	let sourceWidth = $state(0);
 	let sourceHeight = $state(0);
-	let outputUrl = $state<string | null>(null);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let burnCaptions = $state(false);
@@ -121,12 +121,18 @@
 			);
 			const data = await ffmpeg.readFile(outputName);
 
-			outputUrl = URL.createObjectURL(
+			exportResult.url = URL.createObjectURL(
 				new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
 			);
+			exportResult.downloadName = `vidm-${mode}${mode !== 'none' ? `-${ratio.label}` : ''}-${speed}x.mp4`;
 
 			ffmpeg.off('progress', offProgress as never);
 			status = 'done';
+			// Client-side navigation (not a hard reload) — the blob URL above
+			// stays valid since it's still the same document. The /export
+			// page's "back" button does the hard reload this app actually
+			// needs before the next conversion (see its own comment).
+			await goto('/export');
 		} catch (err) {
 			status = 'error';
 			errorMessage = err instanceof Error ? err.message : String(err);
@@ -139,8 +145,7 @@
 		<div class="space-y-1">
 			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
 			<p class="text-muted-foreground text-sm">
-				Upload a video, then reformat, adjust speed, compress, and caption it — each one
-				optional. Runs entirely in your browser.
+				Upload a video, then reformat, adjust speed, compress, and caption it. Runs entirely in your browser.
 			</p>
 		</div>
 		<ThemeToggle />
@@ -202,13 +207,5 @@
 		<p class="text-muted-foreground text-sm">Reformatting… {progress}%</p>
 	{:else if status === 'error'}
 		<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
-	{/if}
-
-	{#if outputUrl}
-		<VideoPreview
-			src={outputUrl}
-			downloadName={`vidm-${mode}${mode !== 'none' ? `-${ratio.label}` : ''}-${speed}x.mp4`}
-		/>
-		<p class="text-muted-foreground text-sm">To reformat another video, refresh the page.</p>
 	{/if}
 </main>
