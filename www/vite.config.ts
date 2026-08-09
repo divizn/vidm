@@ -1,4 +1,5 @@
 import { sveltekit } from '@sveltejs/kit/vite';
+import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vitest/config';
 import type { Plugin } from 'vite';
 
@@ -30,7 +31,7 @@ function crossOriginIsolation(): Plugin {
 }
 
 export default defineConfig({
-	plugins: [crossOriginIsolation(), sveltekit()],
+	plugins: [crossOriginIsolation(), tailwindcss(), sveltekit()],
 	optimizeDeps: {
 		// Pre-bundling breaks @ffmpeg/ffmpeg's internal Web Worker loading.
 		exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util']

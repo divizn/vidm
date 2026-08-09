@@ -17,6 +17,9 @@
 	import CropPositioner from '$lib/components/CropPositioner.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
+	import { Card, CardContent } from '$lib/components/ui/card';
+	import { Button } from '$lib/components/ui/button';
+	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
 
@@ -90,9 +93,17 @@
 	}
 </script>
 
-<main>
-	<h1>vidm — portrait reformatter</h1>
-	<p>Upload a landscape video, reformat it, preview, and download. Runs entirely in your browser.</p>
+<main class="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
+	<div class="flex items-start justify-between gap-4">
+		<div class="space-y-1">
+			<h1 class="text-2xl font-bold tracking-tight">vidm — portrait reformatter</h1>
+			<p class="text-muted-foreground text-sm">
+				Upload a landscape video, reformat it, preview, and download. Runs entirely in your
+				browser.
+			</p>
+		</div>
+		<ThemeToggle />
+	</div>
 
 	{#if status === 'configuring' && !sourceFile}
 		<UploadDropzone onFile={handleFile} />
@@ -108,56 +119,38 @@
 	{/if}
 
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
-		<FormatToggle bind:mode />
-		<RatioSelector bind:ratio />
-		<SpeedControl bind:speed />
-		<CompressionControl bind:compression />
+		<Card>
+			<CardContent class="space-y-5">
+				<FormatToggle bind:mode />
+				<RatioSelector bind:ratio />
+				<SpeedControl bind:speed />
+				<CompressionControl bind:compression />
+			</CardContent>
+		</Card>
 
 		{#if mode === 'crop'}
-			<CropPositioner file={sourceFile} {ratio} bind:crop />
+			<Card>
+				<CardContent>
+					<CropPositioner file={sourceFile} {ratio} bind:crop />
+				</CardContent>
+			</Card>
 		{/if}
 
-		<button onclick={run}>Export</button>
+		<Button onclick={run} class="self-start">Export</Button>
 
 		<CaptionsPanel file={sourceFile} />
 	{/if}
 
 	{#if status === 'loading-engine'}
-		<p>Loading FFmpeg engine…</p>
+		<p class="text-muted-foreground text-sm">Loading FFmpeg engine…</p>
 	{:else if status === 'processing'}
-		<p>Reformatting… {progress}%</p>
+		<p class="text-muted-foreground text-sm">Reformatting… {progress}%</p>
 	{:else if status === 'error'}
-		<p class="error">Something went wrong: {errorMessage}</p>
+		<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	{/if}
 
 	{#if outputUrl}
 		<VideoPreview src={outputUrl} downloadName={`vidm-${mode}-${ratio.label}-${speed}x.mp4`} />
-		<p class="note">To reformat another video, refresh the page.</p>
+		<p class="text-muted-foreground text-sm">To reformat another video, refresh the page.</p>
 	{/if}
 </main>
-
-<style>
-	main {
-		max-width: 640px;
-		margin: 0 auto;
-		padding: 2rem 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 1.25rem;
-	}
-
-	.error {
-		color: #dc2626;
-	}
-
-	.note {
-		font-size: 0.9rem;
-		color: #666;
-	}
-
-	button {
-		align-self: flex-start;
-		padding: 0.5rem 1.25rem;
-		font-weight: 600;
-	}
-</style>
