@@ -1,5 +1,0 @@
-{
-	"version": 1,
-	"include": ["/ffmpeg/ffmpeg-core.wasm", "/whisper/ggml-tiny.en-q5_1.bin"],
-	"exclude": []
-}
