@@ -4,6 +4,9 @@
 # Local test assets (sample videos, etc.) — not meant to be committed
 /test
 
+# Wrangler local cache (lands here if a wrangler command runs from repo root)
+/.wrangler
+
 # OS
 .DS_Store
 Thumbs.db
