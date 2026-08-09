@@ -44,6 +44,16 @@
 	let burnCaptions = $state(false);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 
+	// Every option is independently optional (reformat, speed, compression,
+	// captions) — but exporting with literally nothing selected would just
+	// re-encode the source unchanged for no reason, so require at least one.
+	const hasActiveTransform = $derived(
+		mode !== 'none' ||
+			speed !== 1 ||
+			compression.mode !== 'none' ||
+			(burnCaptions && captionSegments.length > 0)
+	);
+
 	function handleFile(file: File) {
 		sourceFile = file;
 	}
@@ -153,7 +163,9 @@
 		<Card>
 			<CardContent class="space-y-5">
 				<FormatToggle bind:mode />
-				<RatioSelector bind:ratio />
+				{#if mode !== 'none'}
+					<RatioSelector bind:ratio />
+				{/if}
 				<SpeedControl bind:speed />
 				<CompressionControl bind:compression />
 			</CardContent>
@@ -167,7 +179,14 @@
 			</Card>
 		{/if}
 
-		<Button onclick={run} class="self-start">Export</Button>
+		<div class="flex flex-col items-start gap-1.5">
+			<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
+			{#if !hasActiveTransform}
+				<p class="text-muted-foreground text-sm">
+					Select at least one option — reformat, speed, compression, or captions — to export.
+				</p>
+			{/if}
+		</div>
 
 		<CaptionsPanel
 			file={sourceFile}
@@ -186,7 +205,10 @@
 	{/if}
 
 	{#if outputUrl}
-		<VideoPreview src={outputUrl} downloadName={`vidm-${mode}-${ratio.label}-${speed}x.mp4`} />
+		<VideoPreview
+			src={outputUrl}
+			downloadName={`vidm-${mode}${mode !== 'none' ? `-${ratio.label}` : ''}-${speed}x.mp4`}
+		/>
 		<p class="text-muted-foreground text-sm">To reformat another video, refresh the page.</p>
 	{/if}
 </main>

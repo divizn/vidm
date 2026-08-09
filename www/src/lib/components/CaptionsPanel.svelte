@@ -8,6 +8,7 @@
 	import { Checkbox } from '$lib/components/ui/checkbox';
 	import { Label } from '$lib/components/ui/label';
 	import CaptionStyleControl from './CaptionStyleControl.svelte';
+	import CaptionPreview from './CaptionPreview.svelte';
 
 	let {
 		file,
@@ -113,6 +114,7 @@
 			</div>
 			{#if burnIn}
 				<CaptionStyleControl bind:style />
+				<CaptionPreview {file} {segments} {style} />
 			{/if}
 		{/if}
 	</CardContent>
