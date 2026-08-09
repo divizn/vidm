@@ -1,5 +1,8 @@
 # sv
 
+Scaffolded with [`sv`](https://github.com/sveltejs/cli) — for what this app actually
+does, see the [root README](../README.md) and [CLAUDE.md](../CLAUDE.md).
+
 Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
 
 ## Creating a project
