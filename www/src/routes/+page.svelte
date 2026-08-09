@@ -94,7 +94,7 @@
 					sourceWidth,
 					sourceHeight
 				});
-				const assContent = buildAssSubtitle(captionSegments, captionStyle, outW, outH);
+				const assContent = buildAssSubtitle(captionSegments, captionStyle, outW, outH, speed);
 				await ffmpeg.writeFile('captions.ass', assContent);
 				await ffmpeg.createDir('fonts');
 				await ffmpeg.writeFile(
