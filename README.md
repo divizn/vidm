@@ -1,7 +1,6 @@
 # vidm
 
 ![CI](https://github.com/divizn/vidm/actions/workflows/ci.yml/badge.svg)
-![Deploy](https://github.com/divizn/vidm/actions/workflows/deploy.yml/badge.svg)
 
 A browser-based, lightweight video editor: reformat to portrait (or
 another ratio), adjust speed, compress, and auto-generate styled,
@@ -51,11 +50,12 @@ and push to main — `main` is branch-protected on them passing.
 
 ## Deployment
 
-`.github/workflows/deploy.yml` builds `www/` and deploys it to
-Cloudflare Workers (project `vidm`) via `wrangler deploy` on every
-push to `main`. Requires `CLOUDFLARE_API_TOKEN` and
-`CLOUDFLARE_ACCOUNT_ID` repo secrets. See the Deploy badge above for
-current status.
+`.github/workflows/ci.yml` has a `deploy` job that builds `www/` and
+deploys it to Cloudflare Workers (project `vidm`) via `wrangler deploy`
+on every push to `main` — gated behind the `test` job (`needs: test`) so
+a broken build can't go live even on a direct push to `main`. Requires
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` repo secrets. See the
+CI badge above for current status.
 
 ## Status
 
