@@ -45,6 +45,8 @@ jobs:
         working-directory: www
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
         with:
@@ -60,11 +62,25 @@ jobs:
 
       - run: pnpm build
 
+      # ffmpeg-core.wasm and the whisper model are large (tens of MB) and
+      # almost never change — re-uploading them to R2 on every deploy costs
+      # real time for no reason, so only do it when this push actually
+      # touched one of them.
+      - name: Check if large R2 assets changed
+        id: r2-assets
+        run: |
+          if git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- static/ffmpeg/ffmpeg-core.wasm static/whisper/ggml-tiny.en-q5_1.bin; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
       # ffmpeg-core.wasm and the whisper model exceed Workers static
       # assets' 25 MiB per-file limit — deployed to R2 instead (see
       # worker.ts) and stripped from the static output here so the
       # assets upload doesn't reject the deploy.
       - uses: cloudflare/wrangler-action@v3
+        if: steps.r2-assets.outputs.changed == 'true'
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
