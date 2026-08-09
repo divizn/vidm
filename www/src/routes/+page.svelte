@@ -3,12 +3,16 @@
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
 	import {
 		buildExportArgs,
+		computeOutputDimensions,
 		ASPECT_RATIOS,
 		DEFAULT_COMPRESSION,
 		type ReformatMode,
 		type CropRegion,
 		type CompressionSettings
 	} from '$lib/ffmpeg/filters';
+	import { buildAssSubtitle } from '$lib/captions/ass';
+	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
+	import type { CaptionSegment } from '$lib/whisper/srt';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
@@ -36,6 +40,9 @@
 	let sourceHeight = $state(0);
 	let outputUrl = $state<string | null>(null);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
+	let captionSegments = $state<CaptionSegment[]>([]);
+	let burnCaptions = $state(false);
+	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 
 	function handleFile(file: File) {
 		sourceFile = file;
@@ -66,6 +73,28 @@
 			const inputName = 'input.mp4';
 			const outputName = 'output.mp4';
 			await ffmpeg.writeFile(inputName, await fetchFile(sourceFile));
+
+			let captionsAssPath: string | undefined;
+			let captionsFontsDir: string | undefined;
+			if (burnCaptions && captionSegments.length > 0) {
+				const { width: outW, height: outH } = computeOutputDimensions({
+					mode,
+					ratio,
+					crop,
+					sourceWidth,
+					sourceHeight
+				});
+				const assContent = buildAssSubtitle(captionSegments, captionStyle, outW, outH);
+				await ffmpeg.writeFile('captions.ass', assContent);
+				await ffmpeg.createDir('fonts');
+				await ffmpeg.writeFile(
+					`fonts/${captionStyle.font.file}`,
+					await fetchFile(`/fonts/${captionStyle.font.file}`)
+				);
+				captionsAssPath = 'captions.ass';
+				captionsFontsDir = 'fonts';
+			}
+
 			await ffmpeg.exec(
 				buildExportArgs(inputName, outputName, {
 					mode,
@@ -75,7 +104,9 @@
 					compression,
 					sourceDurationSeconds: sourceDuration,
 					sourceWidth,
-					sourceHeight
+					sourceHeight,
+					captionsAssPath,
+					captionsFontsDir
 				})
 			);
 			const data = await ffmpeg.readFile(outputName);
@@ -138,7 +169,12 @@
 
 		<Button onclick={run} class="self-start">Export</Button>
 
-		<CaptionsPanel file={sourceFile} />
+		<CaptionsPanel
+			file={sourceFile}
+			bind:segments={captionSegments}
+			bind:burnIn={burnCaptions}
+			bind:style={captionStyle}
+		/>
 	{/if}
 
 	{#if status === 'loading-engine'}

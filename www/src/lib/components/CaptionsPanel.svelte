@@ -1,18 +1,31 @@
 <script lang="ts">
 	import { transcribeFile } from '$lib/whisper/client';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
+	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { Card, CardContent, CardHeader, CardTitle } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
+	import { Checkbox } from '$lib/components/ui/checkbox';
+	import { Label } from '$lib/components/ui/label';
+	import CaptionStyleControl from './CaptionStyleControl.svelte';
 
-	let { file }: { file: File } = $props();
+	let {
+		file,
+		segments = $bindable([]),
+		burnIn = $bindable(false),
+		style = $bindable({ ...DEFAULT_CAPTION_STYLE })
+	}: {
+		file: File;
+		segments?: CaptionSegment[];
+		burnIn?: boolean;
+		style?: CaptionStyle;
+	} = $props();
 
 	type Status = 'idle' | 'transcribing' | 'done' | 'error';
 
 	let status = $state<Status>('idle');
 	let progress = $state(0);
 	let errorMessage = $state('');
-	let segments = $state<CaptionSegment[]>([]);
 
 	const srtUrl = $derived(
 		segments.length
@@ -21,6 +34,14 @@
 	);
 
 	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
+
+	function editSegmentText(index: number, text: string) {
+		// Editing invalidates that segment's word-level timing (it no longer
+		// matches the edited text), so drop it — burn-in falls back to
+		// plain (non-karaoke) text for this segment instead of highlighting
+		// against stale word boundaries.
+		segments[index] = { ...segments[index], text, words: undefined };
+	}
 
 	async function generate() {
 		status = 'transcribing';
@@ -70,7 +91,11 @@
 				{#each segments as segment, i (i)}
 					<li class="space-y-1">
 						<span class="text-muted-foreground text-xs">{segment.from} → {segment.to}</span>
-						<Input type="text" bind:value={segment.text} />
+						<Input
+							type="text"
+							value={segment.text}
+							oninput={(e) => editSegmentText(i, e.currentTarget.value)}
+						/>
 					</li>
 				{/each}
 			</ul>
@@ -78,6 +103,16 @@
 				<Button href={srtUrl} download="captions.srt" variant="outline"
 					>Download captions.srt</Button
 				>
+			{/if}
+
+			<div class="flex items-center gap-2">
+				<Checkbox id="burn-captions" bind:checked={burnIn} />
+				<Label for="burn-captions" class="cursor-pointer font-normal"
+					>Burn captions into exported video</Label
+				>
+			</div>
+			{#if burnIn}
+				<CaptionStyleControl bind:style />
 			{/if}
 		{/if}
 	</CardContent>
