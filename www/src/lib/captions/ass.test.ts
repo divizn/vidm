@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	advancePreviewTime,
 	buildAssSubtitle,
 	escapeAssText,
 	getActiveCaption,
@@ -169,5 +170,24 @@ describe('getActiveCaption', () => {
 		expect(getActiveCaption(segments, 1)).toEqual([
 			{ text: 'Hello world', highlighted: false }
 		]);
+	});
+});
+
+describe('advancePreviewTime', () => {
+	const segments: CaptionSegment[] = [
+		{ from: '00:00:01,000', to: '00:00:02,000', text: 'Hello' },
+		{ from: '00:00:02,000', to: '00:00:04,000', text: 'world' }
+	];
+
+	it('advances by deltaSeconds within range', () => {
+		expect(advancePreviewTime(1, 0.5, segments)).toBe(1.5);
+	});
+
+	it('wraps back to the first segment start once past the last segment end', () => {
+		expect(advancePreviewTime(3.9, 0.5, segments)).toBe(1);
+	});
+
+	it('returns 0 for an empty segments array', () => {
+		expect(advancePreviewTime(5, 1, [])).toBe(0);
 	});
 });
