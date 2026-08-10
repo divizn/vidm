@@ -53,6 +53,14 @@
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('trim');
+	// Captions transcribes against whatever the trim range is *at generate
+	// time* — jumping straight to Captions without ever looking at Trim
+	// risks transcribing the untrimmed video, then immediately invalidating
+	// that work the moment trim is actually set. Requiring one visit to the
+	// Trim tab first (it's also the default tab, so this is normally just
+	// "look before you leave") nudges the trim-then-caption order without
+	// forcing a specific trim value.
+	let hasVisitedTrim = $state(false);
 	let trimStart = $state(0);
 	// 0 doubles as "not yet initialized" until sourceDuration loads (see the
 	// $effect below) — TrimControl and buildExportSummary both treat
@@ -112,7 +120,13 @@
 			icon: ArchiveIcon,
 			enabled: compression.mode !== 'none'
 		},
-		{ id: 'captions', label: 'Captions', icon: CaptionsIcon, enabled: captionSegments.length > 0 }
+		{
+			id: 'captions',
+			label: 'Captions',
+			icon: CaptionsIcon,
+			enabled: captionSegments.length > 0,
+			disabledReason: hasVisitedTrim ? undefined : 'Check your trim range first'
+		}
 	]);
 
 	// The crop box only overlays the video while actively viewing the
@@ -124,6 +138,16 @@
 		sourceFile = file;
 		trimStart = 0;
 		trimEnd = 0; // re-derived once metadata loads, via the $effect above
+		hasVisitedTrim = false;
+		activeTool = 'trim';
+	}
+
+	// Marks trim as "visited" the moment the user navigates away from it —
+	// simply starting on the Trim tab (it's the default) isn't enough, since
+	// that's true before they've looked at anything.
+	function handleActiveChange(id: string) {
+		if (activeTool === 'trim' && id !== 'trim') hasVisitedTrim = true;
+		activeTool = id as ActiveTool;
 	}
 
 	async function run() {
@@ -225,7 +249,7 @@
 		<ToolTabs
 			tabs={toolTabs}
 			active={activeTool}
-			onActiveChange={(id) => (activeTool = id as ActiveTool)}
+			onActiveChange={handleActiveChange}
 		/>
 
 		<Card>
