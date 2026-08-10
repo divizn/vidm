@@ -4,12 +4,22 @@
 	let {
 		file,
 		ratio,
-		crop = $bindable()
-	}: { file: File; ratio: AspectRatio; crop: CropRegion } = $props();
+		crop = $bindable(),
+		showCropBox,
+		sourceWidth = $bindable(0),
+		sourceHeight = $bindable(0),
+		sourceDuration = $bindable(0)
+	}: {
+		file: File;
+		ratio: AspectRatio;
+		crop: CropRegion;
+		showCropBox: boolean;
+		sourceWidth?: number;
+		sourceHeight?: number;
+		sourceDuration?: number;
+	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
-	let sourceWidth = $state(0);
-	let sourceHeight = $state(0);
 	let renderedWidth = $state(0);
 	let renderedHeight = $state(0);
 
@@ -29,6 +39,7 @@
 		if (!videoEl) return;
 		sourceWidth = videoEl.videoWidth;
 		sourceHeight = videoEl.videoHeight;
+		sourceDuration = videoEl.duration;
 		renderedWidth = videoEl.clientWidth;
 		renderedHeight = videoEl.clientHeight;
 		// Some browsers (notably Firefox) never paint a frame for a paused,
@@ -167,7 +178,7 @@
 		playsinline
 		class="block w-full rounded-md"
 	></video>
-	{#if sourceWidth}
+	{#if showCropBox && sourceWidth}
 		<div
 			class="border-primary bg-primary/20 absolute cursor-grab touch-none border-2 active:cursor-grabbing"
 			style:width={`${boxSizeFrac.w * 100}%`}
@@ -192,11 +203,11 @@
 		</div>
 	{/if}
 </div>
-{#if sourceWidth}
+{#if showCropBox && sourceWidth}
 	<p class="text-muted-foreground mt-1.5 text-center text-sm tabular-nums">
 		Output: {outputSize.width} × {outputSize.height}px
 	</p>
+	<p class="text-muted-foreground mt-1.5 text-center text-sm">
+		Drag the box to reposition, or the corner handle to resize.
+	</p>
 {/if}
-<p class="text-muted-foreground mt-1.5 text-center text-sm">
-	Drag the box to reposition, or the corner handle to resize.
-</p>
