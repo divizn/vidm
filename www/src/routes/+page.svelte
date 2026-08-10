@@ -13,16 +13,17 @@
 		type CompressionSettings
 	} from '$lib/ffmpeg/filters';
 	import { buildAssSubtitle } from '$lib/captions/ass';
+	import { buildExportSummary } from '$lib/editor-summary';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import type { CaptionSegment } from '$lib/whisper/srt';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
+	import ToolCard from '$lib/components/ToolCard.svelte';
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
 	import SpeedControl from '$lib/components/SpeedControl.svelte';
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CropPositioner from '$lib/components/CropPositioner.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
-	import { Card, CardContent } from '$lib/components/ui/card';
 	import { Button } from '$lib/components/ui/button';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 
@@ -33,15 +34,16 @@
 	let errorMessage = $state('');
 	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
+	let speedEnabled = $state(false);
 	let speed = $state(1);
-	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION });
+	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION, mode: 'none' });
 	let sourceFile = $state<File | null>(null);
 	let sourceDuration = $state(0);
 	let sourceWidth = $state(0);
 	let sourceHeight = $state(0);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
-	let burnCaptions = $state(false);
+	let captionsEnabled = $state(false);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 
 	// Every option is independently optional (reformat, speed, compression,
@@ -49,9 +51,21 @@
 	// re-encode the source unchanged for no reason, so require at least one.
 	const hasActiveTransform = $derived(
 		mode !== 'none' ||
-			speed !== 1 ||
+			speedEnabled ||
 			compression.mode !== 'none' ||
-			(burnCaptions && captionSegments.length > 0)
+			(captionsEnabled && captionSegments.length > 0)
+	);
+
+	const exportSummary = $derived(
+		buildExportSummary({
+			mode,
+			ratio,
+			speedEnabled,
+			speed,
+			compression,
+			captionsEnabled,
+			hasCaptionSegments: captionSegments.length > 0
+		})
 	);
 
 	function handleFile(file: File) {
@@ -86,7 +100,7 @@
 
 			let captionsAssPath: string | undefined;
 			let captionsFontsDir: string | undefined;
-			if (burnCaptions && captionSegments.length > 0) {
+			if (captionsEnabled && captionSegments.length > 0) {
 				const { width: outW, height: outH } = computeOutputDimensions({
 					mode,
 					ratio,
@@ -165,26 +179,49 @@
 	{/if}
 
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
-		<Card>
-			<CardContent class="space-y-5">
-				<FormatToggle bind:mode />
-				{#if mode !== 'none'}
-					<RatioSelector bind:ratio />
-				{/if}
-				<SpeedControl bind:speed />
-				<CompressionControl bind:compression />
-			</CardContent>
-		</Card>
+		<ToolCard
+			title="Reformat"
+			enabled={mode !== 'none'}
+			onEnabledChange={(v) => (mode = v ? 'crop' : 'none')}
+		>
+			<FormatToggle bind:mode />
+			<RatioSelector bind:ratio />
+			{#if mode === 'crop'}
+				<CropPositioner file={sourceFile} {ratio} bind:crop />
+			{/if}
+		</ToolCard>
 
-		{#if mode === 'crop'}
-			<Card>
-				<CardContent>
-					<CropPositioner file={sourceFile} {ratio} bind:crop />
-				</CardContent>
-			</Card>
-		{/if}
+		<ToolCard
+			title="Speed"
+			enabled={speedEnabled}
+			onEnabledChange={(v) => {
+				speedEnabled = v;
+				speed = v ? 1.5 : 1;
+			}}
+		>
+			<SpeedControl bind:speed />
+		</ToolCard>
+
+		<ToolCard
+			title="Compression"
+			enabled={compression.mode !== 'none'}
+			onEnabledChange={(v) => (compression = { ...compression, mode: v ? 'preset' : 'none' })}
+		>
+			<CompressionControl bind:compression />
+		</ToolCard>
+
+		<ToolCard
+			title="Captions"
+			enabled={captionsEnabled}
+			onEnabledChange={(v) => (captionsEnabled = v)}
+		>
+			<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
+		</ToolCard>
 
 		<div class="flex flex-col items-start gap-1.5">
+			{#if exportSummary.length > 0}
+				<p class="text-muted-foreground text-sm">{exportSummary.join(' · ')}</p>
+			{/if}
 			<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
 			{#if !hasActiveTransform}
 				<p class="text-muted-foreground text-sm">
@@ -192,13 +229,6 @@
 				</p>
 			{/if}
 		</div>
-
-		<CaptionsPanel
-			file={sourceFile}
-			bind:segments={captionSegments}
-			bind:burnIn={burnCaptions}
-			bind:style={captionStyle}
-		/>
 	{/if}
 
 	{#if status === 'loading-engine'}

@@ -10,8 +10,7 @@
 
 	const options: { value: ReformatMode; label: string }[] = [
 		{ value: 'crop', label: 'Center crop' },
-		{ value: 'blur-pad', label: 'Blur padded' },
-		{ value: 'none', label: 'No reformat' }
+		{ value: 'blur-pad', label: 'Blur padded' }
 	];
 </script>
 
