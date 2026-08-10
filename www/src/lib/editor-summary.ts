@@ -4,6 +4,7 @@ import {
 	type CompressionSettings,
 	type ReformatMode
 } from '$lib/ffmpeg/filters';
+import { formatTimecode } from '$lib/timecode';
 
 function compressionLabel(compression: CompressionSettings): string {
 	if (compression.mode === 'size') return `Compression (~${compression.targetMB}MB)`;
@@ -20,6 +21,9 @@ export interface EditorSummaryInput {
 	speed: number;
 	compression: CompressionSettings;
 	hasCaptionSegments: boolean;
+	trimStart: number;
+	trimEnd: number;
+	sourceDuration: number;
 }
 
 // One-line "what will actually happen on export" summary shown next to the
@@ -30,6 +34,10 @@ export interface EditorSummaryInput {
 // compression mode, an actual transcript) is itself the signal.
 export function buildExportSummary(input: EditorSummaryInput): string[] {
 	const parts: string[] = [];
+
+	if (input.trimStart > 0 || input.trimEnd < input.sourceDuration) {
+		parts.push(`Trim ${formatTimecode(input.trimStart)}–${formatTimecode(input.trimEnd)}`);
+	}
 
 	if (input.mode === 'crop') parts.push(`Crop ${input.ratio.label}`);
 	else if (input.mode === 'blur-pad') parts.push(`Blur pad ${input.ratio.label}`);

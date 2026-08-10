@@ -8,7 +8,11 @@
 		showCropBox,
 		sourceWidth = $bindable(0),
 		sourceHeight = $bindable(0),
-		sourceDuration = $bindable(0)
+		sourceDuration = $bindable(0),
+		trimStart = 0,
+		trimEnd = 0,
+		clampToTrim = false,
+		speed = 1
 	}: {
 		file: File;
 		ratio: AspectRatio;
@@ -17,6 +21,10 @@
 		sourceWidth?: number;
 		sourceHeight?: number;
 		sourceDuration?: number;
+		trimStart?: number;
+		trimEnd?: number;
+		clampToTrim?: boolean;
+		speed?: number;
 	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
@@ -85,6 +93,33 @@
 			y: toEven(offsetYFrac * slackY)
 		};
 	});
+
+	// Jumps the preview to the trim start when the Trim tab becomes active,
+	// and again whenever the user drags the start handle while it's active
+	// — trimEnd changing doesn't need its own seek, the loop-back in
+	// onTimeUpdate below handles that once playback reaches it.
+	$effect(() => {
+		if (!videoEl || !clampToTrim) return;
+		videoEl.currentTime = trimStart;
+	});
+
+	// Mirrors the Speed tool's value onto the preview element itself, so
+	// scrubbing/playing the source preview approximates the exported
+	// pacing — the export's own audio pitch-correction (atempo) isn't
+	// replicated here, this is just the native playbackRate the browser
+	// already knows how to apply.
+	$effect(() => {
+		if (!videoEl) return;
+		videoEl.playbackRate = speed;
+	});
+
+	function onTimeUpdate() {
+		if (!clampToTrim || !videoEl) return;
+		if (videoEl.currentTime >= trimEnd) {
+			videoEl.currentTime = trimStart;
+			videoEl.pause();
+		}
+	}
 
 	// Live readout of the actual export resolution this crop region will
 	// produce — reuses the same computeOutputDimensions call +page.svelte
@@ -174,6 +209,8 @@
 		bind:this={videoEl}
 		src={objectUrl}
 		onloadedmetadata={onLoadedMetadata}
+		ontimeupdate={onTimeUpdate}
+		controls
 		muted
 		playsinline
 		class="block w-full rounded-md"
