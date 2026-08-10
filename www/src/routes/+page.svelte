@@ -52,7 +52,7 @@
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
-	let activeTool = $state<ActiveTool>('reformat');
+	let activeTool = $state<ActiveTool>('trim');
 	let trimStart = $state(0);
 	// 0 doubles as "not yet initialized" until sourceDuration loads (see the
 	// $effect below) — TrimControl and buildExportSummary both treat
