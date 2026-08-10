@@ -65,6 +65,8 @@ function baseOptions(overrides: Partial<ExportOptions> = {}): ExportOptions {
 		crop: CROP,
 		compression: DEFAULT_COMPRESSION,
 		sourceDurationSeconds: 10,
+		trimStart: 0,
+		trimEnd: 10,
 		sourceWidth: 1920,
 		sourceHeight: 1080,
 		...overrides
@@ -253,6 +255,80 @@ describe('buildExportArgs', () => {
 			const vf = args[args.indexOf('-vf') + 1];
 			expect(vf).toContain('ass=captions.ass:fontsdir=fonts');
 			expect(vf).not.toContain('crop=');
+		});
+	});
+
+	describe('trim', () => {
+		it('adds no trim args when the range covers the full source duration', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
+			expect(args).not.toContain('-ss');
+			expect(args).not.toContain('-t');
+		});
+
+		it('adds -ss/-t as input options before -i when the trim range is active', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ trimStart: 2, trimEnd: 8 }));
+
+			expect(args).toContain('-ss');
+			expect(args[args.indexOf('-ss') + 1]).toBe('2');
+			expect(args).toContain('-t');
+			expect(args[args.indexOf('-t') + 1]).toBe('6');
+
+			const firstInputIndex = args.indexOf('-i');
+			expect(args.indexOf('-ss')).toBeLessThan(firstInputIndex);
+			expect(args.indexOf('-t')).toBeLessThan(firstInputIndex);
+		});
+
+		it('treats trimStart alone (trimEnd left at the full duration) as an active trim', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ trimStart: 3, trimEnd: 10 }));
+			expect(args[args.indexOf('-ss') + 1]).toBe('3');
+			expect(args[args.indexOf('-t') + 1]).toBe('7');
+		});
+
+		it('treats trimEnd alone (trimStart left at 0) as an active trim', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ trimStart: 0, trimEnd: 6 }));
+			expect(args[args.indexOf('-ss') + 1]).toBe('0');
+			expect(args[args.indexOf('-t') + 1]).toBe('6');
+		});
+
+		it('adds trim args before both inputs in blur-pad mode', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ mode: 'blur-pad', trimStart: 1, trimEnd: 9 })
+			);
+
+			const ssIndices = args.reduce<number[]>((acc, a, i) => (a === '-ss' ? [...acc, i] : acc), []);
+			const inputIndices = args.reduce<number[]>((acc, a, i) => (a === '-i' ? [...acc, i] : acc), []);
+			expect(ssIndices).toHaveLength(2);
+			expect(inputIndices).toHaveLength(2);
+			expect(ssIndices[0]).toBeLessThan(inputIndices[0]);
+			expect(ssIndices[1]).toBeLessThan(inputIndices[1]);
+			expect(args[ssIndices[0] + 1]).toBe('1');
+			expect(args[ssIndices[1] + 1]).toBe('1');
+		});
+
+		it('budgets size-mode compression against the trimmed duration, not the full source', () => {
+			const full = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ compression: { mode: 'size', crf: 23, targetMB: 3 } })
+			);
+			const trimmed = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({
+					trimStart: 5,
+					trimEnd: 10, // half the 10s source
+					compression: { mode: 'size', crf: 23, targetMB: 3 }
+				})
+			);
+
+			const fullKbps = Number(full[full.indexOf('-b:v') + 1].replace('k', ''));
+			const trimmedKbps = Number(trimmed[trimmed.indexOf('-b:v') + 1].replace('k', ''));
+
+			// Same 3MB budget over half the duration -> roughly double the bitrate.
+			expect(trimmedKbps).toBeGreaterThan(fullKbps * 1.8);
+			expect(trimmedKbps).toBeLessThan(fullKbps * 2.2);
 		});
 	});
 });

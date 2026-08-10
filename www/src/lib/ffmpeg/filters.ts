@@ -49,6 +49,11 @@ export interface CropRegion {
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 4;
 
+// A trim range narrower than this would produce a degenerate (near-zero
+// length) clip — enforced at the UI layer (TrimControl), referenced here
+// so the export/UI code share one source of truth.
+export const MIN_TRIM_DURATION_SECONDS = 0.5;
+
 // Splits a speed factor into one or two comma-chained atempo filters, each
 // within atempo's own 0.5-2.0 per-instance range. Only ever needs two
 // filters for the current MIN_SPEED/MAX_SPEED bounds: 2.0 absorbs
@@ -110,6 +115,12 @@ export interface ExportOptions {
 	crop: CropRegion;
 	compression: CompressionSettings;
 	sourceDurationSeconds: number;
+	// Trim range in seconds, into the source file's own timeline. Equal to
+	// [0, sourceDurationSeconds] when trim is inactive — callers must
+	// default it that way so this module can tell "no trim" apart from "a
+	// deliberately narrow range" without a separate enabled flag.
+	trimStart: number;
+	trimEnd: number;
 	// Source frame dimensions — used so blur-pad (which keeps the whole
 	// frame) doesn't upscale beyond what the source actually has.
 	sourceWidth: number;
@@ -156,11 +167,19 @@ export function buildExportArgs(
 		crop,
 		compression,
 		sourceDurationSeconds,
+		trimStart,
+		trimEnd,
 		sourceWidth,
 		sourceHeight,
 		captionsAssPath,
 		captionsFontsDir
 	} = options;
+
+	// Applied as *input* options (before -i), using -t (duration) rather
+	// than -to (absolute end) — -to as an input option is relative to the
+	// file's own start, not to -ss, which would double-trim the tail.
+	const trimIsActive = trimStart > 0 || trimEnd < sourceDurationSeconds;
+	const trimArgs = trimIsActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : [];
 
 	const needsSpeedFilters = speed !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
@@ -184,8 +203,9 @@ export function buildExportArgs(
 		sourceHeight
 	});
 
-	const args = ['-i', inputName];
-	if (mode === 'blur-pad') args.push('-i', inputName);
+	const args: string[] = [];
+	args.push(...trimArgs, '-i', inputName);
+	if (mode === 'blur-pad') args.push(...trimArgs, '-i', inputName);
 
 	const speedSuffix = needsSpeedFilters ? `,setpts=PTS/${speed}` : '';
 
@@ -244,7 +264,7 @@ export function buildExportArgs(
 		// means a second encode pass over the same video — another
 		// concurrent pipeline, and another way to hit the deadlock above.
 		// Output will land close to the target, not exact.
-		const outputDurationSec = sourceDurationSeconds / speed;
+		const outputDurationSec = (trimEnd - trimStart) / speed;
 		const totalBits = compression.targetMB * 8 * 1024 * 1024;
 		const audioBits = AUDIO_BITRATE_KBPS * 1000 * outputDurationSec;
 		const videoBitrateKbps = Math.max(
