@@ -13,9 +13,13 @@ files change behavior; `+layout.svelte` gains one new child.
 
 No footer exists yet. `www/src/routes/+layout.svelte` only renders
 `{@render children()}` plus the favicon link. The repo is
-`github.com/divizn/vidm` (from `git remote`). Icons already come from
-`@lucide/svelte`, imported per-icon (e.g. `@lucide/svelte/icons/sun`) for
-tree-shaking — `@lucide/svelte/icons/github` follows the same pattern.
+`github.com/divizn/vidm` (from `git remote`). Icons elsewhere in the app
+come from `@lucide/svelte`, imported per-icon (e.g.
+`@lucide/svelte/icons/sun`) for tree-shaking, but Lucide dropped brand/logo
+marks (no `github` icon in the installed version, `1.30.0` — only generic
+`git-*` icons remain) — confirmed by checking the installed package during
+implementation. The GitHub mark is inlined as a plain SVG in `Footer.svelte`
+instead of adding a new icon-library dependency for one icon.
 
 ## Component
 
