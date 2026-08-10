@@ -10,10 +10,8 @@ describe('buildExportSummary', () => {
 			buildExportSummary({
 				mode: 'none',
 				ratio: ASPECT_RATIOS[0],
-				speedEnabled: false,
 				speed: 1,
 				compression: offCompression,
-				captionsEnabled: false,
 				hasCaptionSegments: false
 			})
 		).toEqual([]);
@@ -23,10 +21,8 @@ describe('buildExportSummary', () => {
 		const result = buildExportSummary({
 			mode: 'crop',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: false,
 			speed: 1,
 			compression: offCompression,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual(['Crop 9:16']);
@@ -36,23 +32,19 @@ describe('buildExportSummary', () => {
 		const result = buildExportSummary({
 			mode: 'blur-pad',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: false,
 			speed: 1,
 			compression: offCompression,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual(['Blur pad 9:16']);
 	});
 
-	it('includes the speed multiplier when speed is enabled and not 1x', () => {
+	it('includes the speed multiplier when speed is not 1x', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: true,
 			speed: 1.5,
 			compression: offCompression,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual(['1.50x speed']);
@@ -62,23 +54,19 @@ describe('buildExportSummary', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: true,
 			speed: 1.35,
 			compression: offCompression,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual(['1.35x speed']);
 	});
 
-	it('excludes speed when enabled but left at the no-op 1x value', () => {
+	it('excludes speed when left at the no-op 1x value', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: true,
 			speed: 1,
 			compression: offCompression,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual([]);
@@ -88,24 +76,20 @@ describe('buildExportSummary', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: false,
 			speed: 1,
 			compression: DEFAULT_COMPRESSION,
-			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
 		expect(result).toEqual(['Compression']);
 	});
 
-	it('includes captions only when enabled AND a transcript exists', () => {
+	it('includes captions only when a transcript exists', () => {
 		expect(
 			buildExportSummary({
 				mode: 'none',
 				ratio: ASPECT_RATIOS[0],
-				speedEnabled: false,
 				speed: 1,
 				compression: offCompression,
-				captionsEnabled: true,
 				hasCaptionSegments: false
 			})
 		).toEqual([]);
@@ -114,10 +98,8 @@ describe('buildExportSummary', () => {
 			buildExportSummary({
 				mode: 'none',
 				ratio: ASPECT_RATIOS[0],
-				speedEnabled: false,
 				speed: 1,
 				compression: offCompression,
-				captionsEnabled: true,
 				hasCaptionSegments: true
 			})
 		).toEqual(['Captions']);
@@ -127,10 +109,8 @@ describe('buildExportSummary', () => {
 		const result = buildExportSummary({
 			mode: 'crop',
 			ratio: ASPECT_RATIOS[0],
-			speedEnabled: true,
 			speed: 1.5,
 			compression: DEFAULT_COMPRESSION,
-			captionsEnabled: true,
 			hasCaptionSegments: true
 		});
 		expect(result).toEqual(['Crop 9:16', '1.50x speed', 'Compression', 'Captions']);
