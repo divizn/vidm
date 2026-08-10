@@ -43,10 +43,20 @@ export interface CropRegion {
 	height: number;
 }
 
-// atempo only accepts 0.5-2.0 in a single filter instance; values outside
-// that need chaining multiple atempo filters, which isn't supported here.
+// atempo only accepts 0.5-2.0 in a single filter instance — speeds above
+// 2x chain two atempo filters (see buildAtempoChain) to reach MAX_SPEED
+// without exceeding that per-filter limit.
 export const MIN_SPEED = 0.5;
-export const MAX_SPEED = 2;
+export const MAX_SPEED = 4;
+
+// Splits a speed factor into one or two comma-chained atempo filters, each
+// within atempo's own 0.5-2.0 per-instance range. Only ever needs two
+// filters for the current MIN_SPEED/MAX_SPEED bounds: 2.0 absorbs
+// everything above 2x, leaving a remainder that's always <= MAX_SPEED / 2.
+function buildAtempoChain(speed: number): string {
+	if (speed <= 2) return `atempo=${speed}`;
+	return `atempo=2,atempo=${speed / 2}`;
+}
 
 export type CompressionMode = 'none' | 'preset' | 'size' | 'custom';
 
@@ -223,7 +233,7 @@ export function buildExportArgs(
 	}
 
 	if (needsAudioReencode) {
-		if (needsSpeedFilters) args.push('-filter:a', `atempo=${speed}`);
+		if (needsSpeedFilters) args.push('-filter:a', buildAtempoChain(speed));
 		args.push('-c:a', 'aac', '-b:a', `${AUDIO_BITRATE_KBPS}k`);
 	} else {
 		args.push('-c:a', 'copy');

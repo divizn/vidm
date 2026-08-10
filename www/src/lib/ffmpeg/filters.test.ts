@@ -113,6 +113,24 @@ describe('buildExportArgs', () => {
 		expect(args).toContain('copy');
 	});
 
+	it('chains two atempo filters for speeds above 2x, since atempo only accepts 0.5-2.0 per instance', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 3 }));
+
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=2,atempo=1.5');
+	});
+
+	it('chains two atempo=2 filters for the max 4x speed', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 4 }));
+
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=2,atempo=2');
+	});
+
+	it('still uses a single atempo filter at exactly 2x', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 2 }));
+
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=2');
+	});
+
 	it('compression "none" adds no -crf or -b:v', () => {
 		const args = buildExportArgs(
 			'in.mp4',

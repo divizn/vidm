@@ -1,15 +1,25 @@
 <script lang="ts">
-	import type { AspectRatio, CropRegion } from '$lib/ffmpeg/filters';
+	import { computeOutputDimensions, type AspectRatio, type CropRegion } from '$lib/ffmpeg/filters';
 
 	let {
 		file,
 		ratio,
-		crop = $bindable()
-	}: { file: File; ratio: AspectRatio; crop: CropRegion } = $props();
+		crop = $bindable(),
+		showCropBox,
+		sourceWidth = $bindable(0),
+		sourceHeight = $bindable(0),
+		sourceDuration = $bindable(0)
+	}: {
+		file: File;
+		ratio: AspectRatio;
+		crop: CropRegion;
+		showCropBox: boolean;
+		sourceWidth?: number;
+		sourceHeight?: number;
+		sourceDuration?: number;
+	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
-	let sourceWidth = $state(0);
-	let sourceHeight = $state(0);
 	let renderedWidth = $state(0);
 	let renderedHeight = $state(0);
 
@@ -29,6 +39,7 @@
 		if (!videoEl) return;
 		sourceWidth = videoEl.videoWidth;
 		sourceHeight = videoEl.videoHeight;
+		sourceDuration = videoEl.duration;
 		renderedWidth = videoEl.clientWidth;
 		renderedHeight = videoEl.clientHeight;
 		// Some browsers (notably Firefox) never paint a frame for a paused,
@@ -74,6 +85,14 @@
 			y: toEven(offsetYFrac * slackY)
 		};
 	});
+
+	// Live readout of the actual export resolution this crop region will
+	// produce — reuses the same computeOutputDimensions call +page.svelte
+	// makes for the real export, so what's shown here never drifts from
+	// what actually gets encoded.
+	const outputSize = $derived(
+		computeOutputDimensions({ mode: 'crop', ratio, crop, sourceWidth, sourceHeight })
+	);
 
 	let dragging = false;
 	let dragStartX = 0;
@@ -159,7 +178,7 @@
 		playsinline
 		class="block w-full rounded-md"
 	></video>
-	{#if sourceWidth}
+	{#if showCropBox && sourceWidth}
 		<div
 			class="border-primary bg-primary/20 absolute cursor-grab touch-none border-2 active:cursor-grabbing"
 			style:width={`${boxSizeFrac.w * 100}%`}
@@ -171,6 +190,11 @@
 			onpointerup={onPointerUp}
 		>
 			<div
+				class="pointer-events-none absolute inset-0"
+				style:background-image={`linear-gradient(to right, color-mix(in srgb, var(--primary) 50%, transparent) 1px, transparent 1px), linear-gradient(to bottom, color-mix(in srgb, var(--primary) 50%, transparent) 1px, transparent 1px)`}
+				style:background-size="33.333% 33.333%"
+			></div>
+			<div
 				class="border-primary bg-primary absolute -right-1.5 -bottom-1.5 size-4 touch-none rounded-full border-2 cursor-nwse-resize"
 				onpointerdown={onResizePointerDown}
 				onpointermove={onResizePointerMove}
@@ -179,6 +203,11 @@
 		</div>
 	{/if}
 </div>
-<p class="text-muted-foreground mt-1.5 text-center text-sm">
-	Drag the box to reposition, or the corner handle to resize.
-</p>
+{#if showCropBox && sourceWidth}
+	<p class="text-muted-foreground mt-1.5 text-center text-sm tabular-nums">
+		Output: {outputSize.width} × {outputSize.height}px
+	</p>
+	<p class="text-muted-foreground mt-1.5 text-center text-sm">
+		Drag the box to reposition, or the corner handle to resize.
+	</p>
+{/if}
