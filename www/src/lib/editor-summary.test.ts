@@ -45,7 +45,7 @@ describe('buildExportSummary', () => {
 		expect(result).toEqual(['Blur pad 9:16']);
 	});
 
-	it('includes the speed multiplier when speed is enabled', () => {
+	it('includes the speed multiplier when speed is enabled and not 1x', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
@@ -55,7 +55,33 @@ describe('buildExportSummary', () => {
 			captionsEnabled: false,
 			hasCaptionSegments: false
 		});
-		expect(result).toEqual(['1.5x speed']);
+		expect(result).toEqual(['1.50x speed']);
+	});
+
+	it('formats a fractional speed to two decimal places', () => {
+		const result = buildExportSummary({
+			mode: 'none',
+			ratio: ASPECT_RATIOS[0],
+			speedEnabled: true,
+			speed: 1.35,
+			compression: offCompression,
+			captionsEnabled: false,
+			hasCaptionSegments: false
+		});
+		expect(result).toEqual(['1.35x speed']);
+	});
+
+	it('excludes speed when enabled but left at the no-op 1x value', () => {
+		const result = buildExportSummary({
+			mode: 'none',
+			ratio: ASPECT_RATIOS[0],
+			speedEnabled: true,
+			speed: 1,
+			compression: offCompression,
+			captionsEnabled: false,
+			hasCaptionSegments: false
+		});
+		expect(result).toEqual([]);
 	});
 
 	it('includes compression when its mode is not none', () => {
@@ -107,6 +133,6 @@ describe('buildExportSummary', () => {
 			captionsEnabled: true,
 			hasCaptionSegments: true
 		});
-		expect(result).toEqual(['Crop 9:16', '1.5x speed', 'Compression', 'Captions']);
+		expect(result).toEqual(['Crop 9:16', '1.50x speed', 'Compression', 'Captions']);
 	});
 });

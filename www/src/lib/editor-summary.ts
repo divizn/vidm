@@ -14,14 +14,15 @@ export interface EditorSummaryInput {
 // Export button — built from exactly the same conditions as the editor
 // page's hasActiveTransform guard, so it never promises something the
 // export won't do (e.g. captions only list once a transcript actually
-// exists, not just because the tool is toggled on).
+// exists, not just because the tool is toggled on; speed only lists when
+// it's actually different from 1x, matching the guard's own no-op check).
 export function buildExportSummary(input: EditorSummaryInput): string[] {
 	const parts: string[] = [];
 
 	if (input.mode === 'crop') parts.push(`Crop ${input.ratio.label}`);
 	else if (input.mode === 'blur-pad') parts.push(`Blur pad ${input.ratio.label}`);
 
-	if (input.speedEnabled) parts.push(`${input.speed}x speed`);
+	if (input.speedEnabled && input.speed !== 1) parts.push(`${input.speed.toFixed(2)}x speed`);
 
 	if (input.compression.mode !== 'none') parts.push('Compression');
 
