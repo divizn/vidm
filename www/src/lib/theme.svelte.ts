@@ -1,6 +1,8 @@
 const STORAGE_KEY = 'vidm-theme';
+const COLOR_THEME_STORAGE_KEY = 'vidm-color-theme';
 
 type Theme = 'light' | 'dark';
+export type ColorTheme = 'warm' | 'cool' | 'high-contrast';
 
 function systemPrefersDark(): boolean {
 	return window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -22,4 +24,30 @@ export function toggleTheme() {
 	themeState.current = themeState.current === 'dark' ? 'light' : 'dark';
 	localStorage.setItem(STORAGE_KEY, themeState.current);
 	apply(themeState.current);
+}
+
+export const colorThemeState = $state<{ current: ColorTheme }>({
+	current: (localStorage.getItem(COLOR_THEME_STORAGE_KEY) as ColorTheme | null) ?? 'warm'
+});
+
+export async function setColorTheme(theme: ColorTheme) {
+	if (theme !== 'warm') {
+		await import(`./themes/${theme}.css`);
+	}
+	colorThemeState.current = theme;
+	localStorage.setItem(COLOR_THEME_STORAGE_KEY, theme);
+	if (theme === 'warm') {
+		delete document.documentElement.dataset.theme;
+	} else {
+		document.documentElement.dataset.theme = theme;
+	}
+}
+
+// Async, unlike apply() above — a returning visitor with a persisted
+// non-warm theme sees a brief flash of the warm (default) palette until
+// this dynamic import resolves. Accepted tradeoff: avoiding it would mean
+// a render-blocking inline script in app.html, not worth it for a cosmetic
+// flash that's gone from cache after the first visit.
+if (colorThemeState.current !== 'warm') {
+	setColorTheme(colorThemeState.current);
 }
