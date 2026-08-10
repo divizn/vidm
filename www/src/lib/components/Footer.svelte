@@ -43,7 +43,7 @@
 	}
 </script>
 
-<footer class="mx-auto flex max-w-2xl justify-end px-4 py-6">
+<footer class="flex justify-end py-6">
 	<a
 		href={PROFILE_URL}
 		target="_blank"

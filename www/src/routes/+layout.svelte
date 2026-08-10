@@ -10,7 +10,7 @@
 	<link rel="icon" href={favicon} />
 </svelte:head>
 
-<div class="flex min-h-screen flex-col">
+<div class="bg-card mx-auto flex min-h-screen max-w-2xl flex-col px-4">
 	<div class="flex-1">
 		{@render children()}
 	</div>

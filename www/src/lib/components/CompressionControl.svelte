@@ -79,22 +79,22 @@
 			>
 		</div>
 	{:else}
-		<div class="flex max-w-sm flex-wrap items-center gap-3">
-			<Label for="crf-slider" class="font-normal">CRF:</Label>
-			<Slider
-				id="crf-slider"
-				type="single"
-				min={MIN_CRF}
-				max={MAX_CRF}
-				value={compression.crf}
-				onValueChange={(v) => (compression = { ...compression, crf: v })}
-				{disabled}
-				class="w-40"
-			/>
-			<span class="text-sm tabular-nums">{compression.crf}</span>
-			<span class="text-muted-foreground w-full text-sm"
-				>Lower = higher quality, larger file.</span
-			>
+		<div class="space-y-1.5">
+			<div class="flex items-center gap-3">
+				<Label for="crf-slider" class="font-normal">CRF:</Label>
+				<Slider
+					id="crf-slider"
+					type="single"
+					min={MIN_CRF}
+					max={MAX_CRF}
+					value={compression.crf}
+					onValueChange={(v) => (compression = { ...compression, crf: v })}
+					{disabled}
+					class="flex-1"
+				/>
+				<span class="text-sm tabular-nums">{compression.crf}</span>
+			</div>
+			<p class="text-muted-foreground text-sm">Lower = higher quality, larger file.</p>
 		</div>
 	{/if}
 </fieldset>
