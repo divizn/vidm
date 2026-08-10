@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { RadioGroup, RadioGroupItem } from '$lib/components/ui/radio-group';
+	import { MIN_SPEED, MAX_SPEED } from '$lib/ffmpeg/filters';
+	import { Slider } from '$lib/components/ui/slider';
 	import { Label } from '$lib/components/ui/label';
 
 	let {
@@ -7,22 +8,32 @@
 		disabled = false
 	}: { speed: number; disabled?: boolean } = $props();
 
-	const options = [0.5, 0.75, 1.25, 1.5, 2];
+	const SPEED_STEP = 0.05;
+
+	// Rounds to the nearest step so repeated 0.05 increments never drift
+	// into floating-point noise (e.g. 1.2999999999999998) — done once
+	// here, at the point speed is set, rather than reformatting it at
+	// every display site.
+	function onSpeedChange(value: number) {
+		speed = Math.round(value / SPEED_STEP) * SPEED_STEP;
+	}
 </script>
 
 <fieldset {disabled} class="space-y-2">
 	<legend class="mb-1 text-sm font-semibold">Playback speed</legend>
-	<RadioGroup
-		value={String(speed)}
-		onValueChange={(v) => (speed = Number(v))}
-		{disabled}
-		class="flex w-auto flex-row flex-wrap gap-4"
-	>
-		{#each options as option (option)}
-			<div class="flex items-center gap-2">
-				<RadioGroupItem value={String(option)} id="speed-{option}" />
-				<Label for="speed-{option}" class="cursor-pointer font-normal">{option}x</Label>
-			</div>
-		{/each}
-	</RadioGroup>
+	<div class="flex max-w-sm flex-wrap items-center gap-3">
+		<Label for="speed-slider" class="font-normal">Speed:</Label>
+		<Slider
+			id="speed-slider"
+			type="single"
+			min={MIN_SPEED}
+			max={MAX_SPEED}
+			step={SPEED_STEP}
+			value={speed}
+			onValueChange={onSpeedChange}
+			{disabled}
+			class="w-40"
+		/>
+		<span class="text-sm tabular-nums">{speed.toFixed(2)}x</span>
+	</div>
 </fieldset>
