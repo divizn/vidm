@@ -238,6 +238,9 @@
 					bind:sourceWidth
 					bind:sourceHeight
 					bind:sourceDuration
+					{trimStart}
+					{trimEnd}
+					clampToTrim={activeTool === 'trim'}
 				/>
 			</CardContent>
 		</Card>
