@@ -97,6 +97,17 @@ export const DEFAULT_COMPRESSION: CompressionSettings = {
 // can budget for it) — see needsAudioReencode below.
 const AUDIO_BITRATE_KBPS = 128;
 
+// libx264 defaults to "medium" when -preset is unset — tuned for
+// compression efficiency, not speed, and it's genuinely slow for a
+// CPU-only WASM encoder (there's no GPU acceleration available to ffmpeg
+// in-browser at all, WASM has no path to hardware encoding). "veryfast"
+// cuts encode time substantially at the cost of a marginally larger file
+// for the same CRF — same visual quality, just slightly less efficient
+// compression. Applied whenever the video is actually being re-encoded;
+// meaningless (and not applied) on the -c:v copy fast path, since no
+// encoder runs there at all.
+const X264_PRESET = 'veryfast';
+
 // The multi-threaded WASM core has a fixed-size pthread pool. A plain crop
 // at 1x fits within it using libx264's default threading. But anything that
 // adds a second concurrent pipeline — blur-pad's dual video streams
@@ -214,6 +225,10 @@ export function buildExportArgs(
 
 	const speedSuffix = needsSpeedFilters ? `,setpts=PTS/${speed}` : '';
 
+	// Only the 'none' mode's -c:v copy fast path skips video re-encoding —
+	// crop and blur-pad always build a -vf/-filter_complex.
+	let videoIsReencoded = true;
+
 	if (mode === 'crop') {
 		// User-positioned crop region (already sized to the target ratio),
 		// scaled only if it exceeds the output cap — never upscaled.
@@ -255,7 +270,12 @@ export function buildExportArgs(
 			args.push('-vf', filters.join(','));
 		} else {
 			args.push('-c:v', 'copy');
+			videoIsReencoded = false;
 		}
+	}
+
+	if (videoIsReencoded) {
+		args.push('-preset', X264_PRESET);
 	}
 
 	if (needsAudioReencode) {

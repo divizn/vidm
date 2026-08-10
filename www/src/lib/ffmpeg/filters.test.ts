@@ -284,6 +284,35 @@ describe('buildExportArgs', () => {
 		});
 	});
 
+	describe('x264 preset', () => {
+		it('sets a fast preset for crop mode (always re-encodes video)', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
+			expect(args).toContain('-preset');
+			expect(args[args.indexOf('-preset') + 1]).toBe('veryfast');
+		});
+
+		it('sets a fast preset for blur-pad mode (always re-encodes video)', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ mode: 'blur-pad' }));
+			expect(args).toContain('-preset');
+			expect(args[args.indexOf('-preset') + 1]).toBe('veryfast');
+		});
+
+		it('sets a fast preset in mode "none" whenever some other option forces a re-encode', () => {
+			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ mode: 'none', speed: 1.5 }));
+			expect(args).toContain('-preset');
+			expect(args[args.indexOf('-preset') + 1]).toBe('veryfast');
+		});
+
+		it('never sets a preset on the -c:v copy fast path — there is no encoder to configure', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ mode: 'none', compression: { mode: 'none', crf: 23, targetMB: 10 } })
+			);
+			expect(args).not.toContain('-preset');
+		});
+	});
+
 	describe('trim', () => {
 		it('adds no trim args when the range covers the full source duration', () => {
 			const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
