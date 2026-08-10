@@ -241,6 +241,7 @@
 					{trimStart}
 					{trimEnd}
 					clampToTrim={activeTool === 'trim'}
+					{speed}
 				/>
 			</CardContent>
 		</Card>

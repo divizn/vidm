@@ -11,7 +11,8 @@
 		sourceDuration = $bindable(0),
 		trimStart = 0,
 		trimEnd = 0,
-		clampToTrim = false
+		clampToTrim = false,
+		speed = 1
 	}: {
 		file: File;
 		ratio: AspectRatio;
@@ -23,6 +24,7 @@
 		trimStart?: number;
 		trimEnd?: number;
 		clampToTrim?: boolean;
+		speed?: number;
 	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
@@ -99,6 +101,16 @@
 	$effect(() => {
 		if (!videoEl || !clampToTrim) return;
 		videoEl.currentTime = trimStart;
+	});
+
+	// Mirrors the Speed tool's value onto the preview element itself, so
+	// scrubbing/playing the source preview approximates the exported
+	// pacing — the export's own audio pitch-correction (atempo) isn't
+	// replicated here, this is just the native playbackRate the browser
+	// already knows how to apply.
+	$effect(() => {
+		if (!videoEl) return;
+		videoEl.playbackRate = speed;
 	});
 
 	function onTimeUpdate() {
