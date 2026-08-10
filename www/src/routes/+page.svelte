@@ -28,13 +28,15 @@
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import ColorThemeToggle from '$lib/components/ColorThemeToggle.svelte';
+	import TrimControl from '$lib/components/TrimControl.svelte';
 	import CropIcon from '@lucide/svelte/icons/crop';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import CaptionsIcon from '@lucide/svelte/icons/captions';
+	import ScissorsIcon from '@lucide/svelte/icons/scissors';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
-	type ActiveTool = 'reformat' | 'speed' | 'compression' | 'captions';
+	type ActiveTool = 'trim' | 'reformat' | 'speed' | 'compression' | 'captions';
 
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
@@ -51,15 +53,35 @@
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('reformat');
+	let trimStart = $state(0);
+	// 0 doubles as "not yet initialized" until sourceDuration loads (see the
+	// $effect below) — TrimControl and buildExportSummary both treat
+	// trimEnd < sourceDuration as "trim active", so this must become the
+	// real duration before either renders anything trim-related.
+	let trimEnd = $state(0);
 
-	// Every option is independently optional (reformat, speed, compression,
-	// captions) — but exporting with literally nothing selected would just
-	// re-encode the source unchanged for no reason, so require at least one.
-	// There's no separate "enabled" flag for any tool — a real selection
-	// (a non-1x speed, a picked reformat/compression mode, an actual
-	// transcript) is itself the signal.
+	// Mirrors how `crop` gets derived from source dimensions once metadata
+	// loads (see SourcePreview) — trim defaults to the full range the first
+	// time sourceDuration becomes available for the current file.
+	$effect(() => {
+		if (sourceDuration > 0 && trimEnd === 0) {
+			trimEnd = sourceDuration;
+		}
+	});
+
+	// Every option is independently optional (trim, reformat, speed,
+	// compression, captions) — but exporting with literally nothing selected
+	// would just re-encode the source unchanged for no reason, so require at
+	// least one. There's no separate "enabled" flag for any tool — a real
+	// selection (a narrowed trim range, a non-1x speed, a picked
+	// reformat/compression mode, an actual transcript) is itself the signal.
 	const hasActiveTransform = $derived(
-		mode !== 'none' || speed !== 1 || compression.mode !== 'none' || captionSegments.length > 0
+		trimStart > 0 ||
+			trimEnd < sourceDuration ||
+			mode !== 'none' ||
+			speed !== 1 ||
+			compression.mode !== 'none' ||
+			captionSegments.length > 0
 	);
 
 	const exportSummary = $derived(
@@ -68,11 +90,20 @@
 			ratio,
 			speed,
 			compression,
-			hasCaptionSegments: captionSegments.length > 0
+			hasCaptionSegments: captionSegments.length > 0,
+			trimStart,
+			trimEnd,
+			sourceDuration
 		})
 	);
 
 	const toolTabs = $derived([
+		{
+			id: 'trim',
+			label: 'Trim',
+			icon: ScissorsIcon,
+			enabled: trimStart > 0 || trimEnd < sourceDuration
+		},
 		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
 		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speed !== 1 },
 		{
@@ -91,6 +122,8 @@
 
 	function handleFile(file: File) {
 		sourceFile = file;
+		trimStart = 0;
+		trimEnd = 0; // re-derived once metadata loads, via the $effect above
 	}
 
 	async function run() {
@@ -141,6 +174,8 @@
 					crop,
 					compression,
 					sourceDurationSeconds: sourceDuration,
+					trimStart,
+					trimEnd,
 					sourceWidth,
 					sourceHeight,
 					captionsAssPath,
@@ -209,6 +244,9 @@
 
 		<Card>
 			<CardContent class="space-y-4">
+				<div class={activeTool === 'trim' ? 'space-y-4' : 'hidden'}>
+					<TrimControl bind:trimStart bind:trimEnd {sourceDuration} />
+				</div>
 				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
 					<FormatToggle bind:mode />
 					<RatioSelector bind:ratio />
