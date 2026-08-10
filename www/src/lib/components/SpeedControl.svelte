@@ -7,7 +7,7 @@
 		disabled = false
 	}: { speed: number; disabled?: boolean } = $props();
 
-	const options = [0.5, 0.75, 1, 1.25, 1.5, 2];
+	const options = [0.5, 0.75, 1.25, 1.5, 2];
 </script>
 
 <fieldset {disabled} class="space-y-2">

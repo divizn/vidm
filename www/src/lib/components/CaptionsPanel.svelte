@@ -19,7 +19,7 @@
 
 	type Status = 'idle' | 'transcribing' | 'done' | 'error';
 
-	let status = $state<Status>('idle');
+	let status = $state<Status>(segments.length ? 'done' : 'idle');
 	let progress = $state(0);
 	let errorMessage = $state('');
 
