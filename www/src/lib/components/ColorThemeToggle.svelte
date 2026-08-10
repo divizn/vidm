@@ -13,7 +13,7 @@
 	const PALETTES: { value: ColorTheme; label: string; swatch: string }[] = [
 		{ value: 'warm', label: 'Warm', swatch: 'oklch(0.65 0.15 22)' },
 		{ value: 'cool', label: 'Cool', swatch: 'oklch(0.6 0.15 250)' },
-		{ value: 'high-contrast', label: 'High contrast', swatch: 'oklch(0.45 0.18 250)' }
+		{ value: 'high-contrast', label: 'High contrast', swatch: 'oklch(0.45 0.2 290)' }
 	];
 
 	function onValueChange(value: string) {
