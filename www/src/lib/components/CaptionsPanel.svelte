@@ -66,25 +66,41 @@
 		segments[index] = { ...segments[index], text, words: undefined };
 	}
 
-	// Re-encodes (doesn't stream-copy) so the cut lands exactly at trimStart
-	// — a copy-mode trim can only cut at keyframes, which could desync the
-	// transcript from the frame-accurate trim the real export applies later.
-	async function extractTrimmedClip(): Promise<File> {
+	// Always extracts a clean mono 16kHz WAV via ffmpeg before transcribing
+	// — not just when trim is active. Whisper's own audio loader
+	// (@transcribe/transcriber's audioFileToPcm32) hands the raw file
+	// straight to the browser's decodeAudioData(), which can fail on
+	// large/high-bitrate video (confirmed: a 140MB, ~39Mbps 2560x1440
+	// screen recording reliably failed there) — and that library swallows
+	// the real decode error, returning null, which then crashes deep in
+	// the whisper WASM module trying to read `.length` off it. Extracting
+	// a small, uncompressed, already-whisper-format audio file up front
+	// sidesteps the browser's container decoding entirely, for every file
+	// (trimmed or not), not just an edge case.
+	// Re-encodes (doesn't stream-copy) so an active trim's cut lands
+	// exactly at trimStart — a copy-mode trim can only cut at keyframes,
+	// which could desync the transcript from the frame-accurate trim the
+	// real export applies later.
+	async function extractAudioForTranscription(): Promise<File> {
 		const ffmpeg = await loadFFmpeg();
-		const inputName = 'caption-trim-input.mp4';
-		const outputName = 'caption-trim-output.mp4';
+		const inputName = 'caption-audio-input.mp4';
+		const outputName = 'caption-audio-output.wav';
 		await ffmpeg.writeFile(inputName, await fetchFile(file));
 		await ffmpeg.exec([
-			'-ss',
-			String(trimStart),
+			...(trimActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : []),
 			'-i',
 			inputName,
-			'-t',
-			String(trimEnd - trimStart),
+			'-vn',
+			'-ac',
+			'1',
+			'-ar',
+			'16000',
+			'-c:a',
+			'pcm_s16le',
 			outputName
 		]);
 		const data = await ffmpeg.readFile(outputName);
-		return new File([new Uint8Array(data as Uint8Array)], 'trimmed.mp4', { type: 'video/mp4' });
+		return new File([new Uint8Array(data as Uint8Array)], 'audio.wav', { type: 'audio/wav' });
 	}
 
 	async function generate() {
@@ -93,8 +109,8 @@
 		errorMessage = '';
 
 		try {
-			const transcribeTarget = trimActive ? await extractTrimmedClip() : file;
-			segments = await transcribeFile(transcribeTarget, (p) => (progress = p));
+			const audioFile = await extractAudioForTranscription();
+			segments = await transcribeFile(audioFile, (p) => (progress = p));
 			status = 'done';
 		} catch (err) {
 			status = 'error';
