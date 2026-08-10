@@ -256,6 +256,32 @@ describe('buildExportArgs', () => {
 			expect(vf).toContain('ass=captions.ass:fontsdir=fonts');
 			expect(vf).not.toContain('crop=');
 		});
+
+		it('forces a real video+audio re-encode when trim alone is active, never -c:v/-c:a copy', () => {
+			// A copy-mode trim (-ss/-t + -c:v copy) can only cut at keyframes —
+			// if trimStart doesn't land on one, the output can start mid-GOP
+			// without its reference frame: an invalid/undecodable stream, not
+			// just an imprecise cut. Trim must force the same re-encode path
+			// speed/captions/compression already do.
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({
+					mode: 'none',
+					speed: 1,
+					compression: { mode: 'none', crf: 23, targetMB: 10 },
+					trimStart: 2,
+					trimEnd: 8
+				})
+			);
+
+			expect(args).not.toContain('copy');
+			expect(args).toContain('-vf');
+			const vf = args[args.indexOf('-vf') + 1];
+			expect(vf).toContain('scale=1920:1080');
+			expect(args).toContain('-c:a');
+			expect(args[args.indexOf('-c:a') + 1]).toBe('aac');
+		});
 	});
 
 	describe('trim', () => {

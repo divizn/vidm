@@ -184,8 +184,13 @@ export function buildExportArgs(
 	const needsSpeedFilters = speed !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
 	// budget it computes for video is actually accurate — a copied audio
-	// track's real bitrate isn't known ahead of time.
-	const needsAudioReencode = needsSpeedFilters || compression.mode === 'size';
+	// track's real bitrate isn't known ahead of time. An active trim also
+	// forces re-encode (video below, audio here) — a copy-mode trim can
+	// only cut at keyframes, so a trimStart that doesn't land on one can
+	// produce an invalid/undecodable output stream, not just an imprecise
+	// cut (same reasoning CaptionsPanel's own trim extraction already
+	// applies for the same reason).
+	const needsAudioReencode = needsSpeedFilters || compression.mode === 'size' || trimIsActive;
 	const extraPipelines = (mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0);
 
 	// Confirmed the `ass` filter alone (plain crop, no other concurrent
@@ -232,12 +237,13 @@ export function buildExportArgs(
 		);
 	} else {
 		// 'none': keep the source frame as-is — no crop/pad/target-ratio
-		// scale. Other options (speed/captions/compression) still apply and
-		// still force a re-encode when active; when none of them are active
-		// either, skip -vf entirely and copy the video stream untouched
-		// rather than pointlessly re-encoding a pixel-identical frame.
+		// scale. Other options (speed/captions/compression/trim) still apply
+		// and still force a re-encode when active; when none of them are
+		// active either, skip -vf entirely and copy the video stream
+		// untouched rather than pointlessly re-encoding a pixel-identical
+		// frame.
 		const filters: string[] = [];
-		if (needsSpeedFilters || captionsAssPath || compression.mode !== 'none') {
+		if (needsSpeedFilters || captionsAssPath || compression.mode !== 'none' || trimIsActive) {
 			// Even-dimension safety net for the (rare) odd-dimensioned source —
 			// libx264/yuv420p requires even width/height. No-op scale otherwise.
 			filters.push(`scale=${outW}:${outH}`, 'setsar=1');
@@ -279,7 +285,8 @@ export function buildExportArgs(
 	// filter still forces a re-encode, libx264 picks its own default (unset
 	// CRF, effectively 23) instead of an app-chosen target. The 'none'
 	// reformat mode's -c:v copy path above is only reachable when
-	// compression.mode is 'none' too, so it never conflicts with -crf/-b:v.
+	// compression.mode is 'none' *and* trim is inactive too, so it never
+	// conflicts with -crf/-b:v.
 
 	if (extraPipelines > 0) {
 		args.push(
