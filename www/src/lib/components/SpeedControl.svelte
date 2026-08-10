@@ -21,7 +21,7 @@
 
 <fieldset {disabled} class="space-y-2">
 	<legend class="mb-1 text-sm font-semibold">Playback speed</legend>
-	<div class="flex max-w-sm flex-wrap items-center gap-3">
+	<div class="flex items-center gap-3">
 		<Label for="speed-slider" class="font-normal">Speed:</Label>
 		<Slider
 			id="speed-slider"
@@ -32,7 +32,7 @@
 			value={speed}
 			onValueChange={onSpeedChange}
 			{disabled}
-			class="w-40"
+			class="flex-1"
 		/>
 		<span class="text-sm tabular-nums">{speed.toFixed(2)}x</span>
 	</div>

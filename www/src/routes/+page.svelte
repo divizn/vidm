@@ -25,6 +25,7 @@
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
+	import { Card, CardContent } from '$lib/components/ui/card';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
 	import CropIcon from '@lucide/svelte/icons/crop';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
@@ -166,7 +167,7 @@
 	}
 </script>
 
-<main class="mx-auto flex max-w-2xl flex-col gap-5 px-4 py-8">
+<main class="flex flex-col gap-5 py-8">
 	<div class="flex items-start justify-between gap-4">
 		<div class="space-y-1">
 			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
@@ -188,41 +189,51 @@
 			onActiveChange={(id) => (activeTool = id as ActiveTool)}
 		/>
 
-		<SourcePreview
-			file={sourceFile}
-			{ratio}
-			bind:crop
-			{showCropBox}
-			bind:sourceWidth
-			bind:sourceHeight
-			bind:sourceDuration
-		/>
+		<Card>
+			<CardContent>
+				<SourcePreview
+					file={sourceFile}
+					{ratio}
+					bind:crop
+					{showCropBox}
+					bind:sourceWidth
+					bind:sourceHeight
+					bind:sourceDuration
+				/>
+			</CardContent>
+		</Card>
 
-		<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
-			<FormatToggle bind:mode />
-			<RatioSelector bind:ratio />
-		</div>
-		<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
-			<SpeedControl bind:speed />
-		</div>
-		<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
-			<CompressionControl bind:compression />
-		</div>
-		<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
-			<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
-		</div>
+		<Card>
+			<CardContent class="space-y-4">
+				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
+					<FormatToggle bind:mode />
+					<RatioSelector bind:ratio />
+				</div>
+				<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
+					<SpeedControl bind:speed />
+				</div>
+				<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
+					<CompressionControl bind:compression />
+				</div>
+				<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
+					<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
+				</div>
+			</CardContent>
+		</Card>
 
-		<div class="flex flex-col items-start gap-1.5">
-			{#if exportSummary.length > 0}
-				<p class="text-muted-foreground text-sm">{exportSummary.join(' · ')}</p>
-			{/if}
-			<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
-			{#if !hasActiveTransform}
-				<p class="text-muted-foreground text-sm">
-					Select at least one option — reformat, speed, compression, or captions — to export.
-				</p>
-			{/if}
-		</div>
+		<Card>
+			<CardContent class="flex flex-col items-start gap-1.5">
+				{#if exportSummary.length > 0}
+					<p class="text-muted-foreground text-sm">{exportSummary.join(' · ')}</p>
+				{/if}
+				<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
+				{#if !hasActiveTransform}
+					<p class="text-muted-foreground text-sm">
+						Select at least one option — reformat, speed, compression, or captions — to export.
+					</p>
+				{/if}
+			</CardContent>
+		</Card>
 	{/if}
 
 	{#if status === 'loading-engine'}

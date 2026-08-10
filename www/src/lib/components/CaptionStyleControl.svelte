@@ -57,7 +57,7 @@
 		</RadioGroup>
 	</div>
 
-	<div class="flex max-w-sm flex-wrap items-center gap-3">
+	<div class="flex items-center gap-3">
 		<Label for="caption-size-slider" class="font-normal">Size:</Label>
 		<Slider
 			id="caption-size-slider"
@@ -67,7 +67,7 @@
 			value={style.fontSizePercent}
 			onValueChange={(v) => (style = { ...style, fontSizePercent: v })}
 			{disabled}
-			class="w-40"
+			class="flex-1"
 		/>
 		<span class="text-sm tabular-nums">{style.fontSizePercent}%</span>
 	</div>

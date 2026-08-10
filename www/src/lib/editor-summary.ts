@@ -1,4 +1,18 @@
-import type { AspectRatio, CompressionSettings, ReformatMode } from '$lib/ffmpeg/filters';
+import {
+	COMPRESSION_PRESETS,
+	type AspectRatio,
+	type CompressionSettings,
+	type ReformatMode
+} from '$lib/ffmpeg/filters';
+
+function compressionLabel(compression: CompressionSettings): string {
+	if (compression.mode === 'size') return `Compression (~${compression.targetMB}MB)`;
+	if (compression.mode === 'preset') {
+		const preset = COMPRESSION_PRESETS.find((p) => p.crf === compression.crf);
+		if (preset) return `Compression (${preset.label})`;
+	}
+	return `Compression (CRF ${compression.crf})`;
+}
 
 export interface EditorSummaryInput {
 	mode: ReformatMode;
@@ -22,7 +36,7 @@ export function buildExportSummary(input: EditorSummaryInput): string[] {
 
 	if (input.speed !== 1) parts.push(`${input.speed.toFixed(2)}x speed`);
 
-	if (input.compression.mode !== 'none') parts.push('Compression');
+	if (input.compression.mode !== 'none') parts.push(compressionLabel(input.compression));
 
 	if (input.hasCaptionSegments) parts.push('Captions');
 

@@ -72,7 +72,7 @@ describe('buildExportSummary', () => {
 		expect(result).toEqual([]);
 	});
 
-	it('includes compression when its mode is not none', () => {
+	it('names the matching preset when compression mode is preset', () => {
 		const result = buildExportSummary({
 			mode: 'none',
 			ratio: ASPECT_RATIOS[0],
@@ -80,7 +80,40 @@ describe('buildExportSummary', () => {
 			compression: DEFAULT_COMPRESSION,
 			hasCaptionSegments: false
 		});
-		expect(result).toEqual(['Compression']);
+		expect(result).toEqual(['Compression (Balanced)']);
+	});
+
+	it('falls back to a CRF number when a preset-mode value matches no preset', () => {
+		const result = buildExportSummary({
+			mode: 'none',
+			ratio: ASPECT_RATIOS[0],
+			speed: 1,
+			compression: { mode: 'preset', crf: 20, targetMB: 10 },
+			hasCaptionSegments: false
+		});
+		expect(result).toEqual(['Compression (CRF 20)']);
+	});
+
+	it('includes the target size when compression mode is size', () => {
+		const result = buildExportSummary({
+			mode: 'none',
+			ratio: ASPECT_RATIOS[0],
+			speed: 1,
+			compression: { mode: 'size', crf: 23, targetMB: 15 },
+			hasCaptionSegments: false
+		});
+		expect(result).toEqual(['Compression (~15MB)']);
+	});
+
+	it('includes the CRF value when compression mode is custom', () => {
+		const result = buildExportSummary({
+			mode: 'none',
+			ratio: ASPECT_RATIOS[0],
+			speed: 1,
+			compression: { mode: 'custom', crf: 30, targetMB: 10 },
+			hasCaptionSegments: false
+		});
+		expect(result).toEqual(['Compression (CRF 30)']);
 	});
 
 	it('includes captions only when a transcript exists', () => {
@@ -113,6 +146,6 @@ describe('buildExportSummary', () => {
 			compression: DEFAULT_COMPRESSION,
 			hasCaptionSegments: true
 		});
-		expect(result).toEqual(['Crop 9:16', '1.50x speed', 'Compression', 'Captions']);
+		expect(result).toEqual(['Crop 9:16', '1.50x speed', 'Compression (Balanced)', 'Captions']);
 	});
 });

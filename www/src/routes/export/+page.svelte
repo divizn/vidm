@@ -13,7 +13,7 @@
 	}
 </script>
 
-<main class="mx-auto flex max-w-2xl flex-col items-center gap-5 px-4 py-8">
+<main class="flex flex-col items-center gap-5 py-8">
 	{#if exportResult.url && exportResult.downloadName}
 		<VideoPreview src={exportResult.url} downloadName={exportResult.downloadName} />
 	{:else}
