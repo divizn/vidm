@@ -17,6 +17,7 @@
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import type { CaptionSegment } from '$lib/whisper/srt';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
+	import ToolTabs, { type ToolTabItem } from '$lib/components/ToolTabs.svelte';
 	import ToolCard from '$lib/components/ToolCard.svelte';
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
@@ -26,8 +27,13 @@
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import CropIcon from '@lucide/svelte/icons/crop';
+	import GaugeIcon from '@lucide/svelte/icons/gauge';
+	import ArchiveIcon from '@lucide/svelte/icons/archive';
+	import CaptionsIcon from '@lucide/svelte/icons/captions';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
+	type ActiveTool = 'reformat' | 'speed' | 'compression' | 'captions';
 
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
@@ -45,13 +51,16 @@
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionsEnabled = $state(false);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
+	let activeTool = $state<ActiveTool>('reformat');
 
 	// Every option is independently optional (reformat, speed, compression,
 	// captions) — but exporting with literally nothing selected would just
 	// re-encode the source unchanged for no reason, so require at least one.
+	// speed's own check excludes the no-op 1x value — a continuous slider
+	// (unlike the old discrete radio options) can land exactly on it.
 	const hasActiveTransform = $derived(
 		mode !== 'none' ||
-			speedEnabled ||
+			(speedEnabled && speed !== 1) ||
 			compression.mode !== 'none' ||
 			(captionsEnabled && captionSegments.length > 0)
 	);
@@ -67,6 +76,18 @@
 			hasCaptionSegments: captionSegments.length > 0
 		})
 	);
+
+	const toolTabs = $derived([
+		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
+		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speedEnabled },
+		{
+			id: 'compression',
+			label: 'Compression',
+			icon: ArchiveIcon,
+			enabled: compression.mode !== 'none'
+		},
+		{ id: 'captions', label: 'Captions', icon: CaptionsIcon, enabled: captionsEnabled }
+	]);
 
 	function handleFile(file: File) {
 		sourceFile = file;
@@ -179,44 +200,52 @@
 	{/if}
 
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
-		<ToolCard
-			title="Reformat"
-			enabled={mode !== 'none'}
-			onEnabledChange={(v) => (mode = v ? 'crop' : 'none')}
-		>
-			<FormatToggle bind:mode />
-			<RatioSelector bind:ratio />
-			{#if mode === 'crop'}
-				<CropPositioner file={sourceFile} {ratio} bind:crop />
-			{/if}
-		</ToolCard>
+		<ToolTabs
+			tabs={toolTabs}
+			active={activeTool}
+			onActiveChange={(id) => (activeTool = id as ActiveTool)}
+		/>
 
-		<ToolCard
-			title="Speed"
-			enabled={speedEnabled}
-			onEnabledChange={(v) => {
-				speedEnabled = v;
-				speed = v ? 1.5 : 1;
-			}}
-		>
-			<SpeedControl bind:speed />
-		</ToolCard>
-
-		<ToolCard
-			title="Compression"
-			enabled={compression.mode !== 'none'}
-			onEnabledChange={(v) => (compression = { ...compression, mode: v ? 'preset' : 'none' })}
-		>
-			<CompressionControl bind:compression />
-		</ToolCard>
-
-		<ToolCard
-			title="Captions"
-			enabled={captionsEnabled}
-			onEnabledChange={(v) => (captionsEnabled = v)}
-		>
-			<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
-		</ToolCard>
+		{#if activeTool === 'reformat'}
+			<ToolCard
+				title="Reformat"
+				enabled={mode !== 'none'}
+				onEnabledChange={(v) => (mode = v ? 'crop' : 'none')}
+			>
+				<FormatToggle bind:mode />
+				<RatioSelector bind:ratio />
+				{#if mode === 'crop'}
+					<CropPositioner file={sourceFile} {ratio} bind:crop />
+				{/if}
+			</ToolCard>
+		{:else if activeTool === 'speed'}
+			<ToolCard
+				title="Speed"
+				enabled={speedEnabled}
+				onEnabledChange={(v) => {
+					speedEnabled = v;
+					speed = v ? 1.5 : 1;
+				}}
+			>
+				<SpeedControl bind:speed />
+			</ToolCard>
+		{:else if activeTool === 'compression'}
+			<ToolCard
+				title="Compression"
+				enabled={compression.mode !== 'none'}
+				onEnabledChange={(v) => (compression = { ...compression, mode: v ? 'preset' : 'none' })}
+			>
+				<CompressionControl bind:compression />
+			</ToolCard>
+		{:else if activeTool === 'captions'}
+			<ToolCard
+				title="Captions"
+				enabled={captionsEnabled}
+				onEnabledChange={(v) => (captionsEnabled = v)}
+			>
+				<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
+			</ToolCard>
+		{/if}
 
 		<div class="flex flex-col items-start gap-1.5">
 			{#if exportSummary.length > 0}
