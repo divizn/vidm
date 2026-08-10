@@ -27,6 +27,7 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
+	import ColorThemeToggle from '$lib/components/ColorThemeToggle.svelte';
 	import CropIcon from '@lucide/svelte/icons/crop';
 	import GaugeIcon from '@lucide/svelte/icons/gauge';
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
@@ -175,7 +176,10 @@
 				Upload a video, then reformat, adjust speed, compress, and caption it. Runs entirely in your browser.
 			</p>
 		</div>
-		<ThemeToggle />
+		<div class="flex items-center gap-1">
+			<ColorThemeToggle />
+			<ThemeToggle />
+		</div>
 	</div>
 
 	{#if status === 'configuring' && !sourceFile}
