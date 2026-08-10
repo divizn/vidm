@@ -42,12 +42,12 @@
 	}
 </script>
 
-<footer class="mx-auto flex max-w-2xl px-4 py-6">
+<footer class="fixed right-4 bottom-4 z-50">
 	<a
 		href="https://github.com/{REPO}"
 		target="_blank"
 		rel="noopener noreferrer"
-		class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
+		class="bg-card border-border text-muted-foreground hover:text-foreground flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm shadow-sm transition-colors"
 	>
 		<svg
 			class="size-4"
