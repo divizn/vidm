@@ -15,7 +15,7 @@
 	// here, at the point speed is set, rather than reformatting it at
 	// every display site.
 	function onSpeedChange(value: number) {
-		speed = Math.round(value / SPEED_STEP) * SPEED_STEP;
+		speed = Math.round(value * 20) / 20;
 	}
 </script>
 

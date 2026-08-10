@@ -30,6 +30,8 @@
 			type="button"
 			role="tab"
 			aria-selected={active === tab.id}
+			aria-label={tab.label}
+			title={tab.label}
 			class={tabClass(tab.id)}
 			onclick={() => onActiveChange(tab.id)}
 		>

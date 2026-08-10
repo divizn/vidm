@@ -79,7 +79,7 @@
 
 	const toolTabs = $derived([
 		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
-		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speedEnabled },
+		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speedEnabled && speed !== 1 },
 		{
 			id: 'compression',
 			label: 'Compression',
@@ -206,7 +206,7 @@
 			onActiveChange={(id) => (activeTool = id as ActiveTool)}
 		/>
 
-		{#if activeTool === 'reformat'}
+		<div class={activeTool === 'reformat' ? '' : 'hidden'}>
 			<ToolCard
 				title="Reformat"
 				enabled={mode !== 'none'}
@@ -218,7 +218,8 @@
 					<CropPositioner file={sourceFile} {ratio} bind:crop />
 				{/if}
 			</ToolCard>
-		{:else if activeTool === 'speed'}
+		</div>
+		<div class={activeTool === 'speed' ? '' : 'hidden'}>
 			<ToolCard
 				title="Speed"
 				enabled={speedEnabled}
@@ -229,7 +230,8 @@
 			>
 				<SpeedControl bind:speed />
 			</ToolCard>
-		{:else if activeTool === 'compression'}
+		</div>
+		<div class={activeTool === 'compression' ? '' : 'hidden'}>
 			<ToolCard
 				title="Compression"
 				enabled={compression.mode !== 'none'}
@@ -237,7 +239,8 @@
 			>
 				<CompressionControl bind:compression />
 			</ToolCard>
-		{:else if activeTool === 'captions'}
+		</div>
+		<div class={activeTool === 'captions' ? '' : 'hidden'}>
 			<ToolCard
 				title="Captions"
 				enabled={captionsEnabled}
@@ -245,7 +248,7 @@
 			>
 				<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
 			</ToolCard>
-		{/if}
+		</div>
 
 		<div class="flex flex-col items-start gap-1.5">
 			{#if exportSummary.length > 0}
