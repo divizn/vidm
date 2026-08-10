@@ -261,7 +261,14 @@
 					<CompressionControl bind:compression />
 				</div>
 				<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
-					<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
+					<CaptionsPanel
+						file={sourceFile}
+						bind:segments={captionSegments}
+						bind:style={captionStyle}
+						{trimStart}
+						{trimEnd}
+						{sourceDuration}
+					/>
 				</div>
 			</CardContent>
 		</Card>
