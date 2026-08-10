@@ -17,13 +17,12 @@
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import type { CaptionSegment } from '$lib/whisper/srt';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
-	import ToolTabs, { type ToolTabItem } from '$lib/components/ToolTabs.svelte';
-	import ToolCard from '$lib/components/ToolCard.svelte';
+	import ToolTabs from '$lib/components/ToolTabs.svelte';
+	import SourcePreview from '$lib/components/SourcePreview.svelte';
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
 	import SpeedControl from '$lib/components/SpeedControl.svelte';
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
-	import CropPositioner from '$lib/components/CropPositioner.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
@@ -40,7 +39,6 @@
 	let errorMessage = $state('');
 	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
-	let speedEnabled = $state(false);
 	let speed = $state(1);
 	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION, mode: 'none' });
 	let sourceFile = $state<File | null>(null);
@@ -49,55 +47,48 @@
 	let sourceHeight = $state(0);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
-	let captionsEnabled = $state(false);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('reformat');
 
 	// Every option is independently optional (reformat, speed, compression,
 	// captions) — but exporting with literally nothing selected would just
 	// re-encode the source unchanged for no reason, so require at least one.
-	// speed's own check excludes the no-op 1x value — a continuous slider
-	// (unlike the old discrete radio options) can land exactly on it.
+	// There's no separate "enabled" flag for any tool — a real selection
+	// (a non-1x speed, a picked reformat/compression mode, an actual
+	// transcript) is itself the signal.
 	const hasActiveTransform = $derived(
-		mode !== 'none' ||
-			(speedEnabled && speed !== 1) ||
-			compression.mode !== 'none' ||
-			(captionsEnabled && captionSegments.length > 0)
+		mode !== 'none' || speed !== 1 || compression.mode !== 'none' || captionSegments.length > 0
 	);
 
 	const exportSummary = $derived(
 		buildExportSummary({
 			mode,
 			ratio,
-			speedEnabled,
 			speed,
 			compression,
-			captionsEnabled,
 			hasCaptionSegments: captionSegments.length > 0
 		})
 	);
 
 	const toolTabs = $derived([
 		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
-		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speedEnabled && speed !== 1 },
+		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speed !== 1 },
 		{
 			id: 'compression',
 			label: 'Compression',
 			icon: ArchiveIcon,
 			enabled: compression.mode !== 'none'
 		},
-		{ id: 'captions', label: 'Captions', icon: CaptionsIcon, enabled: captionsEnabled }
+		{ id: 'captions', label: 'Captions', icon: CaptionsIcon, enabled: captionSegments.length > 0 }
 	]);
+
+	// The crop box only overlays the video while actively viewing the
+	// Reformat tab in crop mode — showing it while the user is looking at
+	// a different tool's panel would be irrelevant clutter.
+	const showCropBox = $derived(mode === 'crop' && activeTool === 'reformat');
 
 	function handleFile(file: File) {
 		sourceFile = file;
-	}
-
-	function onSourceVideoLoaded(e: Event) {
-		const video = e.target as HTMLVideoElement;
-		sourceDuration = video.duration;
-		sourceWidth = video.videoWidth;
-		sourceHeight = video.videoHeight;
 	}
 
 	async function run() {
@@ -121,7 +112,7 @@
 
 			let captionsAssPath: string | undefined;
 			let captionsFontsDir: string | undefined;
-			if (captionsEnabled && captionSegments.length > 0) {
+			if (captionSegments.length > 0) {
 				const { width: outW, height: outH } = computeOutputDimensions({
 					mode,
 					ratio,
@@ -190,15 +181,6 @@
 		<UploadDropzone onFile={handleFile} />
 	{/if}
 
-	{#if sourceFile}
-		<!-- svelte-ignore a11y_media_has_caption -->
-		<video
-			src={URL.createObjectURL(sourceFile)}
-			onloadedmetadata={onSourceVideoLoaded}
-			hidden
-		></video>
-	{/if}
-
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
 		<ToolTabs
 			tabs={toolTabs}
@@ -206,48 +188,28 @@
 			onActiveChange={(id) => (activeTool = id as ActiveTool)}
 		/>
 
-		<div class={activeTool === 'reformat' ? '' : 'hidden'}>
-			<ToolCard
-				title="Reformat"
-				enabled={mode !== 'none'}
-				onEnabledChange={(v) => (mode = v ? 'crop' : 'none')}
-			>
-				<FormatToggle bind:mode />
-				<RatioSelector bind:ratio />
-				{#if mode === 'crop'}
-					<CropPositioner file={sourceFile} {ratio} bind:crop />
-				{/if}
-			</ToolCard>
+		<SourcePreview
+			file={sourceFile}
+			{ratio}
+			bind:crop
+			{showCropBox}
+			bind:sourceWidth
+			bind:sourceHeight
+			bind:sourceDuration
+		/>
+
+		<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
+			<FormatToggle bind:mode />
+			<RatioSelector bind:ratio />
 		</div>
-		<div class={activeTool === 'speed' ? '' : 'hidden'}>
-			<ToolCard
-				title="Speed"
-				enabled={speedEnabled}
-				onEnabledChange={(v) => {
-					speedEnabled = v;
-					speed = v ? 1.5 : 1;
-				}}
-			>
-				<SpeedControl bind:speed />
-			</ToolCard>
+		<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
+			<SpeedControl bind:speed />
 		</div>
-		<div class={activeTool === 'compression' ? '' : 'hidden'}>
-			<ToolCard
-				title="Compression"
-				enabled={compression.mode !== 'none'}
-				onEnabledChange={(v) => (compression = { ...compression, mode: v ? 'preset' : 'none' })}
-			>
-				<CompressionControl bind:compression />
-			</ToolCard>
+		<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
+			<CompressionControl bind:compression />
 		</div>
-		<div class={activeTool === 'captions' ? '' : 'hidden'}>
-			<ToolCard
-				title="Captions"
-				enabled={captionsEnabled}
-				onEnabledChange={(v) => (captionsEnabled = v)}
-			>
-				<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
-			</ToolCard>
+		<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
+			<CaptionsPanel file={sourceFile} bind:segments={captionSegments} bind:style={captionStyle} />
 		</div>
 
 		<div class="flex flex-col items-start gap-1.5">
