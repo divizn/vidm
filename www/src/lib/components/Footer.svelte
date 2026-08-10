@@ -43,7 +43,18 @@
 	}
 </script>
 
-<footer class="flex justify-end py-6">
+<footer class="flex justify-end items-center gap-4 py-6">
+	<span class="text-muted-foreground flex items-center gap-1.5 text-sm">
+		Powered by
+		<a
+			href="https://github.com/FFmpeg/FFmpeg"
+			target="_blank"
+			rel="noopener noreferrer"
+			class="hover:text-foreground underline underline-offset-2 transition-colors"
+		>
+			ffmpeg
+		</a>
+	</span>
 	<a
 		href={PROFILE_URL}
 		target="_blank"
