@@ -56,12 +56,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      # No pnpm/Node setup or `pnpm install` here — this job never runs a
-      # package.json script. It only downloads the build `test` already
-      # produced and shells out to `wrangler` via wrangler-action, which
-      # bundles its own pinned wrangler binary rather than using this
-      # repo's devDependency, so installing node_modules here would be
-      # dead weight on every deploy.
+      # wrangler-action@v3 shells out via the detected package manager
+      # (`pnpm dlx wrangler ...`) rather than bundling its own binary —
+      # without pnpm on PATH it fails with "Unable to locate executable
+      # file: pnpm" (confirmed: this is what broke the previous deploy
+      # after these steps were dropped as "unused"). No `pnpm install`
+      # needed though — wrangler-action never runs a package.json script,
+      # it only needs the `pnpm` executable itself to exist.
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: www/pnpm-lock.yaml
 
       # Reuses the build `test` already produced from the same commit
       # instead of rebuilding — `test` is a required dependency (needs:
