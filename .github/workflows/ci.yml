@@ -60,9 +60,7 @@ jobs:
       # (`pnpm dlx wrangler ...`) rather than bundling its own binary —
       # without pnpm on PATH it fails with "Unable to locate executable
       # file: pnpm" (confirmed: this is what broke the previous deploy
-      # after these steps were dropped as "unused"). No `pnpm install`
-      # needed though — wrangler-action never runs a package.json script,
-      # it only needs the `pnpm` executable itself to exist.
+      # after these steps were dropped as "unused").
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -72,6 +70,16 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: www/pnpm-lock.yaml
+
+      # wrangler-action checks for an already-installed `wrangler` first and
+      # only falls back to installing its own pinned default if none is
+      # found — that default (3.90.0) predates wrangler.jsonc/JSONC config
+      # support, so it can't locate the entry point at all and fails with
+      # "Missing entry-point" (confirmed: this repo's own devDependency is
+      # wrangler ^4, which resolves wrangler.jsonc fine). Installing here
+      # makes wrangler-action pick up that already-satisfied v4 instead of
+      # reaching for its incompatible default.
+      - run: pnpm install --frozen-lockfile
 
       # Reuses the build `test` already produced from the same commit
       # instead of rebuilding — `test` is a required dependency (needs:
