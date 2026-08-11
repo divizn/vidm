@@ -44,10 +44,19 @@
 			/>
 		</span>
 		{#each thumbItems as thumb (thumb.index)}
+			<!--
+			bits-ui positions Thumb with an inline `position: absolute` style,
+			which overrides any `relative`/`self-stretch` classes here — align-self
+			has no effect on an absolutely positioned element with ambiguous
+			top/bottom, so the thumb rendered at 0 height instead of stretching
+			to the track. Explicit `top-0 bottom-0` insets (relative to the
+			`relative` Root, its positioned ancestor) force it to the full
+			track height regardless of that flex behavior.
+			-->
 			<SliderPrimitive.Thumb
 				data-slot="volume-slider-thumb"
 				index={thumb.index}
-				class="relative w-1 self-stretch rounded-sm bg-white shadow-[0_0_6px_rgba(0,0,0,0.5)] transition-shadow block select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden after:absolute after:-inset-3"
+				class="top-0 bottom-0 w-1 rounded-sm bg-white shadow-[0_0_6px_rgba(0,0,0,0.5)] transition-shadow block select-none disabled:pointer-events-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden after:absolute after:-inset-3"
 			/>
 		{/each}
 	{/snippet}
