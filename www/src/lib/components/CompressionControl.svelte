@@ -83,23 +83,25 @@
 		<div class="space-y-1.5">
 			<div class="flex items-center gap-3">
 				<Label for="crf-slider" class="font-normal">CRF:</Label>
-				<Slider
-					id="crf-slider"
-					type="single"
-					min={MIN_CRF}
-					max={MAX_CRF}
-					value={compression.crf}
-					onValueChange={(v) => (compression = { ...compression, crf: v })}
-					{disabled}
-					class="flex-1"
-				/>
+				<div class="flex-1 space-y-1.5">
+					<Slider
+						id="crf-slider"
+						type="single"
+						min={MIN_CRF}
+						max={MAX_CRF}
+						value={compression.crf}
+						onValueChange={(v) => (compression = { ...compression, crf: v })}
+						{disabled}
+						class="w-full"
+					/>
+					<SliderTicks
+						min={MIN_CRF}
+						max={MAX_CRF}
+						ticks={COMPRESSION_PRESETS.map((preset) => ({ value: preset.crf, label: preset.label }))}
+					/>
+				</div>
 				<span class="text-sm tabular-nums">{compression.crf}</span>
 			</div>
-			<SliderTicks
-				min={MIN_CRF}
-				max={MAX_CRF}
-				ticks={COMPRESSION_PRESETS.map((preset) => ({ value: preset.crf, label: preset.label }))}
-			/>
 			<p class="text-muted-foreground text-sm">Lower = higher quality, larger file.</p>
 		</div>
 	{/if}

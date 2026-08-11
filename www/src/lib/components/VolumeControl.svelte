@@ -27,20 +27,22 @@
 	<legend class="mb-1 text-sm font-semibold">Volume</legend>
 	<div class="flex items-center gap-3">
 		<Label for="volume-slider" class="font-normal">Volume:</Label>
-		<Slider
-			id="volume-slider"
-			type="single"
-			min={MIN_PERCENT}
-			max={MAX_PERCENT}
-			step={VOLUME_STEP * 100}
-			value={volumePercent}
-			onValueChange={onVolumeChange}
-			{disabled}
-			class="flex-1"
-		/>
+		<div class="flex-1 space-y-1.5">
+			<Slider
+				id="volume-slider"
+				type="single"
+				min={MIN_PERCENT}
+				max={MAX_PERCENT}
+				step={VOLUME_STEP * 100}
+				value={volumePercent}
+				onValueChange={onVolumeChange}
+				{disabled}
+				class="w-full"
+			/>
+			<SliderTicks min={MIN_PERCENT} max={MAX_PERCENT} ticks={[{ value: 100, label: 'Original' }]} />
+		</div>
 		<span class="text-sm tabular-nums">{volumePercent}%</span>
 	</div>
-	<SliderTicks min={MIN_PERCENT} max={MAX_PERCENT} ticks={[{ value: 100, label: 'Original' }]} />
 	{#if volumePercent > 100}
 		<p class="text-muted-foreground text-sm">
 			The in-editor preview can't play louder than the original — boost above 100% is audible

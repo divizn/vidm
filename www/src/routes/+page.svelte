@@ -240,7 +240,8 @@
 		<div class="space-y-1">
 			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
 			<p class="text-muted-foreground text-sm">
-				Upload a video, then reformat, adjust speed, compress, and caption it. Runs entirely in your browser.
+				Upload a video, then trim, reformat, adjust speed/volume, compress, and caption it. Runs
+				entirely in your browser.
 			</p>
 		</div>
 		<div class="flex items-center gap-1">
@@ -318,7 +319,8 @@
 				<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
 				{#if !hasActiveTransform}
 					<p class="text-muted-foreground text-sm">
-						Select at least one option — reformat, speed, compression, or captions — to export.
+						Select at least one option — trim, reformat, speed, volume, compression, or captions — to
+						export.
 					</p>
 				{/if}
 			</CardContent>

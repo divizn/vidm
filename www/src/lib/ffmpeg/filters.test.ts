@@ -156,6 +156,12 @@ describe('buildExportArgs', () => {
 		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=1.5,volume=0.5');
 	});
 
+	it('combines chained atempo (above 2x speed) with volume in a single -filter:a', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 4, volume: 0.5 }));
+
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=2,atempo=2,volume=0.5');
+	});
+
 	it('volume alone still forces the "none" mode off its -c:v copy fast path\'s audio side', () => {
 		const args = buildExportArgs(
 			'in.mp4',
