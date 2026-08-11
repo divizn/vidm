@@ -12,7 +12,8 @@
 		trimStart = 0,
 		trimEnd = 0,
 		clampToTrim = false,
-		speed = 1
+		speed = 1,
+		volume = 1
 	}: {
 		file: File;
 		ratio: AspectRatio;
@@ -25,6 +26,7 @@
 		trimEnd?: number;
 		clampToTrim?: boolean;
 		speed?: number;
+		volume?: number;
 	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
@@ -111,6 +113,16 @@
 	$effect(() => {
 		if (!videoEl) return;
 		videoEl.playbackRate = speed;
+	});
+
+	// Mirrors the Volume tool's value onto the preview element, same pattern
+	// as the playbackRate mirror above. HTMLMediaElement.volume caps at 1.0
+	// in the browser — values above 1 (a boosted export) clamp to the
+	// loudest the native element can actually play; see VolumeControl's own
+	// note about this limitation.
+	$effect(() => {
+		if (!videoEl) return;
+		videoEl.volume = Math.min(1, volume);
 	});
 
 	function onTimeUpdate() {
@@ -211,7 +223,6 @@
 		onloadedmetadata={onLoadedMetadata}
 		ontimeupdate={onTimeUpdate}
 		controls
-		muted
 		playsinline
 		class="block w-full rounded-md"
 	></video>
