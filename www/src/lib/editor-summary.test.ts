@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildExportSummary, type EditorSummaryInput } from './editor-summary';
+import {
+	buildExportSummary,
+	buildMissingOptionsMessage,
+	buildToolStates,
+	type EditorSummaryInput
+} from './editor-summary';
 import { ASPECT_RATIOS, DEFAULT_COMPRESSION, type CompressionSettings } from '$lib/ffmpeg/filters';
 
 const offCompression: CompressionSettings = { mode: 'none', crf: 23, targetMB: 10 };
@@ -127,5 +132,64 @@ describe('buildExportSummary', () => {
 			'Compression (Balanced)',
 			'Captions'
 		]);
+	});
+});
+
+describe('buildToolStates', () => {
+	it('always returns all six tools, in trim/reformat/speed/volume/compression/captions order', () => {
+		const states = buildToolStates(baseInput());
+		expect(states.map((tool) => tool.id)).toEqual([
+			'trim',
+			'reformat',
+			'speed',
+			'volume',
+			'compression',
+			'captions'
+		]);
+	});
+
+	it('marks every tool inactive with no summaryText when nothing is selected', () => {
+		const states = buildToolStates(baseInput());
+		for (const tool of states) {
+			expect(tool.active).toBe(false);
+			expect(tool.summaryText).toBeUndefined();
+		}
+	});
+
+	it('marks only the tools with a real selection as active, alongside the rest staying inactive', () => {
+		const states = buildToolStates(baseInput({ speed: 1.5, volume: 1.5 }));
+		const byId = Object.fromEntries(states.map((tool) => [tool.id, tool]));
+		expect(byId.speed.active).toBe(true);
+		expect(byId.speed.summaryText).toBe('1.50x speed');
+		expect(byId.volume.active).toBe(true);
+		expect(byId.volume.summaryText).toBe('150% volume');
+		expect(byId.trim.active).toBe(false);
+		expect(byId.reformat.active).toBe(false);
+		expect(byId.compression.active).toBe(false);
+		expect(byId.captions.active).toBe(false);
+	});
+});
+
+describe('buildMissingOptionsMessage', () => {
+	it('lists every tool label, lowercased, with an Oxford comma before "or"', () => {
+		const message = buildMissingOptionsMessage(buildToolStates(baseInput()));
+		expect(message).toBe(
+			'Select at least one option — trim, reformat, speed, volume, compression, or captions — to export.'
+		);
+	});
+
+	it('stays correct with a single tool state (no comma, no "or")', () => {
+		const message = buildMissingOptionsMessage([
+			{ id: 'trim', label: 'Trim', active: false, summaryText: undefined }
+		]);
+		expect(message).toBe('Select at least one option — trim — to export.');
+	});
+
+	it('joins exactly two tool states with "or" and no comma', () => {
+		const message = buildMissingOptionsMessage([
+			{ id: 'trim', label: 'Trim', active: false, summaryText: undefined },
+			{ id: 'speed', label: 'Speed', active: false, summaryText: undefined }
+		]);
+		expect(message).toBe('Select at least one option — trim or speed — to export.');
 	});
 });
