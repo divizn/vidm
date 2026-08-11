@@ -1,5 +1,5 @@
 import { FileTranscriber, type TranscribeToken } from '@transcribe/transcriber';
-import type { CaptionSegment, CaptionWord } from './srt';
+import { parseSrtTimestamp, formatSrtTimestamp, type CaptionSegment, type CaptionWord } from './srt';
 
 // Self-hosted, same COOP/COEP setup as ffmpeg-core-mt (see vite.config.ts).
 // Loaded via dynamic import of the absolute static URL (not a bare package
@@ -14,6 +14,17 @@ import type { CaptionSegment, CaptionWord } from './srt';
 // the source of the crash this file used to work around with diagnostics.
 const SHOUT_URL = '/whisper/shout.wasm.js';
 const MODEL_URL = '/whisper/ggml-tiny.en-q5_1.bin';
+
+// Fixed window each chunk is transcribed in, instead of one pass over the
+// whole file — bounds whisper.cpp's per-call wasm heap growth on long
+// videos and turns progress into per-chunk granularity instead of one
+// opaque whole-file percentage.
+export const TRANSCRIBE_CHUNK_SECONDS = 30;
+
+export interface AudioChunk {
+	file: File;
+	offsetSeconds: number;
+}
 
 // whisper.cpp's BPE tokenizer prefixes a token with a space to mark the
 // start of a new word; a token with no leading space is a continuation
@@ -43,8 +54,12 @@ function wordsFromTokens(tokens: TranscribeToken[]): CaptionWord[] {
 	return words;
 }
 
-export async function transcribeFile(
-	file: File,
+// Transcribes each chunk in sequence against a single loaded model instance
+// (loading the model per chunk would dwarf the cost of transcribing it), then
+// merges the results into one segment list with each chunk's timestamps
+// shifted back onto the original, unchunked timeline.
+export async function transcribeChunks(
+	chunks: AudioChunk[],
 	onProgress?: (percent: number) => void
 ): Promise<CaptionSegment[]> {
 	const { default: createModule } = await import(/* @vite-ignore */ SHOUT_URL);
@@ -52,7 +67,6 @@ export async function transcribeFile(
 	const transcriber = new FileTranscriber({
 		createModule,
 		model: MODEL_URL,
-		onProgress,
 		print: (msg) => console.log('[whisper stdout]', msg),
 		printErr: (msg) => console.error('[whisper stderr]', msg),
 		onAbort: () => console.error('[whisper] Module.onAbort fired'),
@@ -60,13 +74,32 @@ export async function transcribeFile(
 	});
 
 	await transcriber.init();
-	const result = await transcriber.transcribe(file, { lang: 'en' });
-	transcriber.destroy();
 
-	return result.transcription.map((seg) => ({
-		from: seg.timestamps.from,
-		to: seg.timestamps.to,
-		text: seg.text,
-		words: wordsFromTokens(seg.tokens)
-	}));
+	const segments: CaptionSegment[] = [];
+	try {
+		for (let i = 0; i < chunks.length; i++) {
+			const { file, offsetSeconds } = chunks[i];
+			transcriber.onProgress = (chunkPercent: number) => {
+				onProgress?.(Math.round(((i + chunkPercent / 100) / chunks.length) * 100));
+			};
+
+			const result = await transcriber.transcribe(file, { lang: 'en' });
+			for (const seg of result.transcription) {
+				segments.push({
+					from: formatSrtTimestamp(parseSrtTimestamp(seg.timestamps.from) + offsetSeconds),
+					to: formatSrtTimestamp(parseSrtTimestamp(seg.timestamps.to) + offsetSeconds),
+					text: seg.text,
+					words: wordsFromTokens(seg.tokens).map((w) => ({
+						text: w.text,
+						from: w.from + offsetSeconds,
+						to: w.to + offsetSeconds
+					}))
+				});
+			}
+		}
+	} finally {
+		transcriber.destroy();
+	}
+
+	return segments;
 }
