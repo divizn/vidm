@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { MIN_VOLUME, MAX_VOLUME } from '$lib/ffmpeg/filters';
-	import { Slider } from '$lib/components/ui/slider';
+	import VolumeSlider from '$lib/components/VolumeSlider.svelte';
 	import { Label } from '$lib/components/ui/label';
 	import SliderTicks from '$lib/components/SliderTicks.svelte';
 
@@ -28,7 +28,7 @@
 	<div class="flex items-center gap-3">
 		<Label for="volume-slider" class="font-normal">Volume:</Label>
 		<div class="flex-1 space-y-1.5">
-			<Slider
+			<VolumeSlider
 				id="volume-slider"
 				type="single"
 				min={MIN_PERCENT}
