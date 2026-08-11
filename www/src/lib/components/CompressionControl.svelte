@@ -10,6 +10,7 @@
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 	import { Slider } from '$lib/components/ui/slider';
+	import SliderTicks from '$lib/components/SliderTicks.svelte';
 
 	let {
 		compression = $bindable(),
@@ -94,6 +95,11 @@
 				/>
 				<span class="text-sm tabular-nums">{compression.crf}</span>
 			</div>
+			<SliderTicks
+				min={MIN_CRF}
+				max={MAX_CRF}
+				ticks={COMPRESSION_PRESETS.map((preset) => ({ value: preset.crf, label: preset.label }))}
+			/>
 			<p class="text-muted-foreground text-sm">Lower = higher quality, larger file.</p>
 		</div>
 	{/if}
