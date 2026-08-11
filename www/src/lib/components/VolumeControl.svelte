@@ -25,8 +25,8 @@
 
 <fieldset {disabled} class="space-y-2">
 	<legend class="mb-1 text-sm font-semibold">Volume</legend>
-	<div class="flex items-center gap-3">
-		<Label for="volume-slider" class="font-normal">Volume:</Label>
+	<div class="flex items-start gap-3">
+		<Label for="volume-slider" class="mt-3 font-normal">Volume:</Label>
 		<div class="flex-1 space-y-1.5">
 			<VolumeSlider
 				id="volume-slider"
@@ -41,7 +41,7 @@
 			/>
 			<SliderTicks min={MIN_PERCENT} max={MAX_PERCENT} ticks={[{ value: 100, label: 'Original' }]} />
 		</div>
-		<span class="text-sm tabular-nums">{volumePercent}%</span>
+		<span class="mt-3 text-sm tabular-nums">{volumePercent}%</span>
 	</div>
 	{#if volumePercent > 100}
 		<p class="text-muted-foreground text-sm">
