@@ -27,29 +27,102 @@ export interface EditorSummaryInput {
 	sourceDuration: number;
 }
 
+export type ToolId = 'trim' | 'reformat' | 'speed' | 'volume' | 'compression' | 'captions';
+
+export interface ToolState {
+	id: ToolId;
+	label: string;
+	// Whether this tool has a real, non-default selection — the same signal
+	// used everywhere a tool's "is it doing anything" state is needed
+	// (export gating, tab dots, the export summary). There's no separate
+	// "enabled" flag independent of this.
+	active: boolean;
+	// Only meaningful when active — the export-summary fragment for this
+	// tool (e.g. "Trim 0:01.0–0:09.0", "150% volume").
+	summaryText?: string;
+}
+
+// Single source of truth for "which tools are doing something and what do
+// they say about it" — every other per-tool list in the editor page
+// (hasActiveTransform, each tab's enabled dot, the export summary line, the
+// "select at least one option" guard message) derives from this one array
+// instead of separately re-deriving the same active/inactive condition.
+// Adding a new tool means adding one entry here (plus an icon mapping and a
+// panel in +page.svelte, which are unavoidably UI-specific) — not hunting
+// down every place that used to need a matching hand-edit.
+export function buildToolStates(input: EditorSummaryInput): ToolState[] {
+	const trimActive = input.trimStart > 0 || input.trimEnd < input.sourceDuration;
+	const reformatActive = input.mode !== 'none';
+	const speedActive = input.speed !== 1;
+	const volumeActive = input.volume !== 1;
+	const compressionActive = input.compression.mode !== 'none';
+	const captionsActive = input.hasCaptionSegments;
+
+	return [
+		{
+			id: 'trim',
+			label: 'Trim',
+			active: trimActive,
+			summaryText: trimActive
+				? `Trim ${formatTimecode(input.trimStart)}–${formatTimecode(input.trimEnd)}`
+				: undefined
+		},
+		{
+			id: 'reformat',
+			label: 'Reformat',
+			active: reformatActive,
+			summaryText: reformatActive
+				? `${input.mode === 'crop' ? 'Crop' : 'Blur pad'} ${input.ratio.label}`
+				: undefined
+		},
+		{
+			id: 'speed',
+			label: 'Speed',
+			active: speedActive,
+			summaryText: speedActive ? `${input.speed.toFixed(2)}x speed` : undefined
+		},
+		{
+			id: 'volume',
+			label: 'Volume',
+			active: volumeActive,
+			summaryText: volumeActive ? `${Math.round(input.volume * 100)}% volume` : undefined
+		},
+		{
+			id: 'compression',
+			label: 'Compression',
+			active: compressionActive,
+			summaryText: compressionActive ? compressionLabel(input.compression) : undefined
+		},
+		{
+			id: 'captions',
+			label: 'Captions',
+			active: captionsActive,
+			summaryText: captionsActive ? 'Captions' : undefined
+		}
+	];
+}
+
 // One-line "what will actually happen on export" summary shown next to the
-// Export button — built from exactly the same conditions as the editor
-// page's hasActiveTransform guard, so it never promises something the
-// export won't do. There's no separate "enabled" flag for any tool
-// anymore — a real selection (a non-1x speed, a picked reformat/
-// compression mode, an actual transcript) is itself the signal.
+// Export button.
 export function buildExportSummary(input: EditorSummaryInput): string[] {
-	const parts: string[] = [];
+	return buildToolStates(input)
+		.filter((tool) => tool.active)
+		.map((tool) => tool.summaryText!);
+}
 
-	if (input.trimStart > 0 || input.trimEnd < input.sourceDuration) {
-		parts.push(`Trim ${formatTimecode(input.trimStart)}–${formatTimecode(input.trimEnd)}`);
+// The guard message shown when no tool has a real selection yet — lists
+// every tool by name so it can never go stale relative to buildToolStates
+// (previously a hand-written sentence that twice fell out of sync when a
+// new tool, Trim then Volume, was added without updating it).
+export function buildMissingOptionsMessage(toolStates: ToolState[]): string {
+	const labels = toolStates.map((tool) => tool.label.toLowerCase());
+	let joined: string;
+	if (labels.length <= 1) {
+		joined = labels[0] ?? '';
+	} else if (labels.length === 2) {
+		joined = `${labels[0]} or ${labels[1]}`;
+	} else {
+		joined = `${labels.slice(0, -1).join(', ')}, or ${labels.at(-1)}`;
 	}
-
-	if (input.mode === 'crop') parts.push(`Crop ${input.ratio.label}`);
-	else if (input.mode === 'blur-pad') parts.push(`Blur pad ${input.ratio.label}`);
-
-	if (input.speed !== 1) parts.push(`${input.speed.toFixed(2)}x speed`);
-
-	if (input.volume !== 1) parts.push(`${Math.round(input.volume * 100)}% volume`);
-
-	if (input.compression.mode !== 'none') parts.push(compressionLabel(input.compression));
-
-	if (input.hasCaptionSegments) parts.push('Captions');
-
-	return parts;
+	return `Select at least one option — ${joined} — to export.`;
 }

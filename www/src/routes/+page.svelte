@@ -14,7 +14,7 @@
 		type CompressionSettings
 	} from '$lib/ffmpeg/filters';
 	import { buildAssSubtitle } from '$lib/captions/ass';
-	import { buildExportSummary } from '$lib/editor-summary';
+	import { buildToolStates, buildMissingOptionsMessage, type ToolId } from '$lib/editor-summary';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import type { CaptionSegment } from '$lib/whisper/srt';
 	import UploadDropzone from '$lib/components/UploadDropzone.svelte';
@@ -39,7 +39,16 @@
 	import Volume2Icon from '@lucide/svelte/icons/volume-2';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
-	type ActiveTool = 'trim' | 'reformat' | 'speed' | 'volume' | 'compression' | 'captions';
+	type ActiveTool = ToolId;
+
+	const TOOL_ICONS: Record<ToolId, typeof CropIcon> = {
+		trim: ScissorsIcon,
+		reformat: CropIcon,
+		speed: GaugeIcon,
+		volume: Volume2Icon,
+		compression: ArchiveIcon,
+		captions: CaptionsIcon
+	};
 
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
@@ -79,24 +88,15 @@
 		}
 	});
 
-	// Every option is independently optional (trim, reformat, speed,
-	// compression, captions) — but exporting with literally nothing selected
-	// would just re-encode the source unchanged for no reason, so require at
-	// least one. There's no separate "enabled" flag for any tool — a real
-	// selection (a narrowed trim range, a non-1x speed, a picked
-	// reformat/compression mode, an actual transcript) is itself the signal.
-	const hasActiveTransform = $derived(
-		trimStart > 0 ||
-			trimEnd < sourceDuration ||
-			mode !== 'none' ||
-			speed !== 1 ||
-			volume !== 1 ||
-			compression.mode !== 'none' ||
-			captionSegments.length > 0
-	);
-
-	const exportSummary = $derived(
-		buildExportSummary({
+	// Single source of truth for "which tools are doing something" — every
+	// other per-tool list below (hasActiveTransform, each tab's enabled dot,
+	// the export summary line, the "select at least one option" guard
+	// message) derives from this instead of separately re-deriving the same
+	// active/inactive condition per tool (see buildToolStates' own comment
+	// for why: two different tools were each independently forgotten in one
+	// of these lists but not another, in the past).
+	const toolStates = $derived(
+		buildToolStates({
 			mode,
 			ratio,
 			speed,
@@ -109,30 +109,25 @@
 		})
 	);
 
-	const toolTabs = $derived([
-		{
-			id: 'trim',
-			label: 'Trim',
-			icon: ScissorsIcon,
-			enabled: trimStart > 0 || trimEnd < sourceDuration,
-			disabledReason: captionsGenerating ? 'Captions are generating' : undefined
-		},
-		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
-		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speed !== 1 },
-		{ id: 'volume', label: 'Volume', icon: Volume2Icon, enabled: volume !== 1 },
-		{
-			id: 'compression',
-			label: 'Compression',
-			icon: ArchiveIcon,
-			enabled: compression.mode !== 'none'
-		},
-		{
-			id: 'captions',
-			label: 'Captions',
-			icon: CaptionsIcon,
-			enabled: captionSegments.length > 0
-		}
-	]);
+	// Exporting with literally nothing selected would just re-encode the
+	// source unchanged for no reason, so require at least one active tool.
+	const hasActiveTransform = $derived(toolStates.some((tool) => tool.active));
+
+	const exportSummary = $derived(
+		toolStates.filter((tool) => tool.active).map((tool) => tool.summaryText!)
+	);
+
+	const missingOptionsMessage = $derived(buildMissingOptionsMessage(toolStates));
+
+	const toolTabs = $derived(
+		toolStates.map((tool) => ({
+			id: tool.id,
+			label: tool.label,
+			icon: TOOL_ICONS[tool.id],
+			enabled: tool.active,
+			disabledReason: tool.id === 'trim' && captionsGenerating ? 'Captions are generating' : undefined
+		}))
+	);
 
 	// The crop box only overlays the video while actively viewing the
 	// Reformat tab in crop mode — showing it while the user is looking at
@@ -308,10 +303,7 @@
 				{/if}
 				<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
 				{#if !hasActiveTransform}
-					<p class="text-muted-foreground text-sm">
-						Select at least one option — trim, reformat, speed, volume, compression, or captions — to
-						export.
-					</p>
+					<p class="text-muted-foreground text-sm">{missingOptionsMessage}</p>
 				{/if}
 			</CardContent>
 		</Card>
