@@ -17,8 +17,15 @@
 	// Deeper wedge than the first pass — thinner at the quiet end (0%), much
 	// thicker at the loud end (100%), for a more dramatic/visible cone shape
 	// now that the track has more height (h-12) to work with.
+	//
+	// Point order matters here: traced as top-left, top-right, bottom-right,
+	// bottom-left. A previous version had the left-edge pair backwards
+	// (bottom-left's y was smaller than top-left's), which made the polygon
+	// self-intersect for roughly the first 15% of the width — the shape
+	// visibly pinched to a twisted sliver before un-twisting and widening,
+	// instead of growing monotonically from a clean point at 0%.
 	const WEDGE_CLIP =
-		'polygon(0% 58%, 100% 4%, 100% 96%, 0% 42%)';
+		'polygon(0% 42%, 100% 4%, 100% 96%, 0% 58%)';
 </script>
 
 <SliderPrimitive.Root
