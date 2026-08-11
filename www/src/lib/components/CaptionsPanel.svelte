@@ -37,14 +37,18 @@
 	// If trim changes after a transcript already exists, its timestamps no
 	// longer correspond to the new range — clear it rather than leaving it
 	// silently stale, same philosophy as editSegmentText dropping word-level
-	// timing on a manual edit.
+	// timing on a manual edit. clearedByTrimChange drives an explanatory
+	// message so this doesn't look like captions just vanished for no
+	// reason — reset the moment a fresh transcript exists again.
 	let prevTrimStart = trimStart;
 	let prevTrimEnd = trimEnd;
+	let clearedByTrimChange = $state(false);
 
 	$effect(() => {
 		if ((trimStart !== prevTrimStart || trimEnd !== prevTrimEnd) && segments.length > 0) {
 			segments = [];
 			status = 'idle';
+			clearedByTrimChange = true;
 		}
 		prevTrimStart = trimStart;
 		prevTrimEnd = trimEnd;
@@ -107,6 +111,7 @@
 		status = 'transcribing';
 		progress = 0;
 		errorMessage = '';
+		clearedByTrimChange = false;
 
 		try {
 			const audioFile = await extractAudioForTranscription();
@@ -130,7 +135,13 @@
 </script>
 
 {#if status === 'idle'}
-	<Button onclick={generate}>Generate captions</Button>
+	{#if clearedByTrimChange}
+		<p class="text-muted-foreground text-sm">
+			Trim changed since these captions were generated, so they no longer match — regenerate to
+			pick up the new range.
+		</p>
+	{/if}
+	<Button onclick={generate}>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button>
 	{#if trimActive}
 		<p class="text-muted-foreground text-sm">
 			Captions will be generated for the trimmed range ({formatTimecode(trimStart)}–{formatTimecode(
