@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { transcribeFile } from '$lib/whisper/client';
+	import { transcribeChunks, TRANSCRIBE_CHUNK_SECONDS, type AudioChunk } from '$lib/whisper/client';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
@@ -92,10 +92,14 @@
 	// exactly at trimStart — a copy-mode trim can only cut at keyframes,
 	// which could desync the transcript from the frame-accurate trim the
 	// real export applies later.
-	async function extractAudioForTranscription(): Promise<File> {
+	// Splits the extracted audio into TRANSCRIBE_CHUNK_SECONDS-long WAV
+	// files via ffmpeg's segment muxer in the same pass, rather than
+	// extracting one long WAV and slicing it in JS — see
+	// TRANSCRIBE_CHUNK_SECONDS for why chunked transcription exists.
+	async function extractAudioChunksForTranscription(): Promise<AudioChunk[]> {
 		const ffmpeg = await loadFFmpeg();
 		const inputName = 'caption-audio-input.mp4';
-		const outputName = 'caption-audio-output.wav';
+		const chunkPattern = 'caption-audio-chunk-%03d.wav';
 		await ffmpeg.writeFile(inputName, await fetchFile(file));
 		await ffmpeg.exec([
 			...(trimActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : []),
@@ -108,10 +112,29 @@
 			'16000',
 			'-c:a',
 			'pcm_s16le',
-			outputName
+			'-f',
+			'segment',
+			'-segment_time',
+			String(TRANSCRIBE_CHUNK_SECONDS),
+			'-reset_timestamps',
+			'1',
+			chunkPattern
 		]);
-		const data = await ffmpeg.readFile(outputName);
-		return new File([new Uint8Array(data as Uint8Array)], 'audio.wav', { type: 'audio/wav' });
+
+		const chunkNames = (await ffmpeg.listDir('/'))
+			.map((entry) => entry.name)
+			.filter((name) => /^caption-audio-chunk-\d+\.wav$/.test(name))
+			.sort();
+
+		const chunks: AudioChunk[] = [];
+		for (let i = 0; i < chunkNames.length; i++) {
+			const data = await ffmpeg.readFile(chunkNames[i]);
+			chunks.push({
+				file: new File([new Uint8Array(data as Uint8Array)], chunkNames[i], { type: 'audio/wav' }),
+				offsetSeconds: i * TRANSCRIBE_CHUNK_SECONDS
+			});
+		}
+		return chunks;
 	}
 
 	async function generate() {
@@ -122,8 +145,8 @@
 		generating = true;
 
 		try {
-			const audioFile = await extractAudioForTranscription();
-			segments = await transcribeFile(audioFile, (p) => (progress = p));
+			const chunks = await extractAudioChunksForTranscription();
+			segments = await transcribeChunks(chunks, (p) => (progress = p));
 			status = 'done';
 		} catch (err) {
 			status = 'error';

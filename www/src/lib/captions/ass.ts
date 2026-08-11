@@ -1,13 +1,7 @@
-import type { CaptionSegment, CaptionWord } from '$lib/whisper/srt';
+import { parseSrtTimestamp, type CaptionSegment, type CaptionWord } from '$lib/whisper/srt';
 import type { CaptionStyle, CaptionPosition } from './style';
 
-// hh:mm:ss,sss (SRT) -> seconds.
-export function parseSrtTimestamp(ts: string): number {
-	const match = ts.match(/^(\d+):(\d{2}):(\d{2}),(\d{3})$/);
-	if (!match) return 0;
-	const [, h, m, s, ms] = match;
-	return Number(h) * 3600 + Number(m) * 60 + Number(s) + Number(ms) / 1000;
-}
+export { parseSrtTimestamp };
 
 // seconds -> ASS's "h:mm:ss.cc" (centiseconds).
 export function toAssTimestamp(seconds: number): string {
