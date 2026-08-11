@@ -8,6 +8,7 @@
 		computeOutputDimensions,
 		ASPECT_RATIOS,
 		DEFAULT_COMPRESSION,
+		DEFAULT_VOLUME,
 		type ReformatMode,
 		type CropRegion,
 		type CompressionSettings
@@ -22,6 +23,7 @@
 	import FormatToggle from '$lib/components/FormatToggle.svelte';
 	import RatioSelector from '$lib/components/RatioSelector.svelte';
 	import SpeedControl from '$lib/components/SpeedControl.svelte';
+	import VolumeControl from '$lib/components/VolumeControl.svelte';
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
 	import { Button } from '$lib/components/ui/button';
@@ -34,9 +36,10 @@
 	import ArchiveIcon from '@lucide/svelte/icons/archive';
 	import CaptionsIcon from '@lucide/svelte/icons/captions';
 	import ScissorsIcon from '@lucide/svelte/icons/scissors';
+	import Volume2Icon from '@lucide/svelte/icons/volume-2';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
-	type ActiveTool = 'trim' | 'reformat' | 'speed' | 'compression' | 'captions';
+	type ActiveTool = 'trim' | 'reformat' | 'speed' | 'volume' | 'compression' | 'captions';
 
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
@@ -44,6 +47,7 @@
 	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
 	let speed = $state(1);
+	let volume = $state(DEFAULT_VOLUME);
 	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION, mode: 'none' });
 	let sourceFile = $state<File | null>(null);
 	let sourceDuration = $state(0);
@@ -86,6 +90,7 @@
 			trimEnd < sourceDuration ||
 			mode !== 'none' ||
 			speed !== 1 ||
+			volume !== 1 ||
 			compression.mode !== 'none' ||
 			captionSegments.length > 0
 	);
@@ -95,6 +100,7 @@
 			mode,
 			ratio,
 			speed,
+			volume,
 			compression,
 			hasCaptionSegments: captionSegments.length > 0,
 			trimStart,
@@ -113,6 +119,7 @@
 		},
 		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
 		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speed !== 1 },
+		{ id: 'volume', label: 'Volume', icon: Volume2Icon, enabled: volume !== 1 },
 		{
 			id: 'compression',
 			label: 'Compression',
@@ -183,6 +190,7 @@
 				buildExportArgs(inputName, outputName, {
 					mode,
 					speed,
+					volume,
 					ratio,
 					crop,
 					compression,
@@ -221,7 +229,8 @@
 		<div class="space-y-1">
 			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
 			<p class="text-muted-foreground text-sm">
-				Upload a video, then reformat, adjust speed, compress, and caption it. Runs entirely in your browser.
+				Upload a video, then trim, reformat, adjust speed/volume, compress, and caption it. Runs
+				entirely in your browser.
 			</p>
 		</div>
 		<div class="flex items-center gap-1">
@@ -251,10 +260,11 @@
 					bind:sourceWidth
 					bind:sourceHeight
 					bind:sourceDuration
-					{trimStart}
-					{trimEnd}
+					bind:trimStart
+					bind:trimEnd
 					clampToTrim={activeTool === 'trim'}
 					{speed}
+					{volume}
 				/>
 			</CardContent>
 		</Card>
@@ -270,6 +280,9 @@
 				</div>
 				<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
 					<SpeedControl bind:speed />
+				</div>
+				<div class={activeTool === 'volume' ? 'space-y-4' : 'hidden'}>
+					<VolumeControl bind:volume />
 				</div>
 				<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
 					<CompressionControl bind:compression />
@@ -296,7 +309,8 @@
 				<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
 				{#if !hasActiveTransform}
 					<p class="text-muted-foreground text-sm">
-						Select at least one option — reformat, speed, compression, or captions — to export.
+						Select at least one option — trim, reformat, speed, volume, compression, or captions — to
+						export.
 					</p>
 				{/if}
 			</CardContent>

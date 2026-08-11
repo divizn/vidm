@@ -19,6 +19,7 @@ export interface EditorSummaryInput {
 	mode: ReformatMode;
 	ratio: AspectRatio;
 	speed: number;
+	volume: number;
 	compression: CompressionSettings;
 	hasCaptionSegments: boolean;
 	trimStart: number;
@@ -43,6 +44,8 @@ export function buildExportSummary(input: EditorSummaryInput): string[] {
 	else if (input.mode === 'blur-pad') parts.push(`Blur pad ${input.ratio.label}`);
 
 	if (input.speed !== 1) parts.push(`${input.speed.toFixed(2)}x speed`);
+
+	if (input.volume !== 1) parts.push(`${Math.round(input.volume * 100)}% volume`);
 
 	if (input.compression.mode !== 'none') parts.push(compressionLabel(input.compression));
 

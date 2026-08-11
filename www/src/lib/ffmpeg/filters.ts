@@ -49,6 +49,15 @@ export interface CropRegion {
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 4;
 
+// Gain multiplier for ffmpeg's `volume` audio filter. 1 = unchanged
+// (default, inactive — same "no separate enabled flag" convention as
+// every other tool). 0 = silent. HTMLMediaElement.volume caps at 1.0 in
+// the browser, so the in-editor preview (SourcePreview) can only mirror
+// 0-1 accurately; boosting above 1 is export-only, see its own comment.
+export const MIN_VOLUME = 0;
+export const MAX_VOLUME = 2;
+export const DEFAULT_VOLUME = 1;
+
 // A trim range narrower than this would produce a degenerate (near-zero
 // length) clip — enforced at the UI layer (TrimControl), referenced here
 // so the export/UI code share one source of truth.
@@ -122,6 +131,7 @@ const THREADS_FOR_TWO_EXTRA_PIPELINES = 2;
 export interface ExportOptions {
 	mode: ReformatMode;
 	speed: number;
+	volume: number;
 	ratio: AspectRatio;
 	crop: CropRegion;
 	compression: CompressionSettings;
@@ -174,6 +184,7 @@ export function buildExportArgs(
 	const {
 		mode,
 		speed,
+		volume,
 		ratio,
 		crop,
 		compression,
@@ -193,6 +204,7 @@ export function buildExportArgs(
 	const trimArgs = trimIsActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : [];
 
 	const needsSpeedFilters = speed !== 1;
+	const needsVolumeFilter = volume !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
 	// budget it computes for video is actually accurate — a copied audio
 	// track's real bitrate isn't known ahead of time. An active trim also
@@ -201,7 +213,8 @@ export function buildExportArgs(
 	// produce an invalid/undecodable output stream, not just an imprecise
 	// cut (same reasoning CaptionsPanel's own trim extraction already
 	// applies for the same reason).
-	const needsAudioReencode = needsSpeedFilters || compression.mode === 'size' || trimIsActive;
+	const needsAudioReencode =
+		needsSpeedFilters || needsVolumeFilter || compression.mode === 'size' || trimIsActive;
 	const extraPipelines = (mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0);
 
 	// Confirmed the `ass` filter alone (plain crop, no other concurrent
@@ -279,7 +292,10 @@ export function buildExportArgs(
 	}
 
 	if (needsAudioReencode) {
-		if (needsSpeedFilters) args.push('-filter:a', buildAtempoChain(speed));
+		const audioFilters: string[] = [];
+		if (needsSpeedFilters) audioFilters.push(buildAtempoChain(speed));
+		if (needsVolumeFilter) audioFilters.push(`volume=${volume}`);
+		if (audioFilters.length > 0) args.push('-filter:a', audioFilters.join(','));
 		args.push('-c:a', 'aac', '-b:a', `${AUDIO_BITRATE_KBPS}k`);
 	} else {
 		args.push('-c:a', 'copy');

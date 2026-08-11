@@ -21,7 +21,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 	data-slot="slider"
 	{orientation}
 	class={cn(
-		"data-vertical:min-h-40 relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-vertical:h-full data-vertical:w-auto data-vertical:flex-col",
+		"relative flex w-full touch-none items-center select-none data-disabled:opacity-50 data-[orientation=vertical]:min-h-40 data-[orientation=vertical]:h-full data-[orientation=vertical]:w-auto data-[orientation=vertical]:flex-col",
 		className
 	)}
 	{...restProps}
@@ -31,13 +31,14 @@ get along, so we shut typescript up by casting `value` to `never`.
 			data-slot="slider-track"
 			data-orientation={orientation}
 			class={cn(
-				"rounded-full bg-muted data-horizontal:h-1 data-horizontal:w-full data-vertical:h-full data-vertical:w-1 relative grow overflow-hidden bg-muted data-horizontal:w-full data-vertical:h-full"
+				"rounded-full bg-muted relative grow overflow-hidden data-[orientation=horizontal]:h-2.5 data-[orientation=horizontal]:w-full data-[orientation=vertical]:h-full data-[orientation=vertical]:w-2.5"
 			)}
 		>
 			<SliderPrimitive.Range
 				data-slot="slider-range"
 				class={cn(
-					"bg-primary absolute select-none data-horizontal:h-full data-vertical:w-full"
+					"absolute select-none rounded-full data-[orientation=horizontal]:h-full data-[orientation=vertical]:w-full",
+					"bg-[linear-gradient(90deg,var(--primary),color-mix(in_oklch,var(--primary),white_35%))]"
 				)}
 			/>
 		</span>
@@ -45,7 +46,7 @@ get along, so we shut typescript up by casting `value` to `never`.
 			<SliderPrimitive.Thumb
 				data-slot="slider-thumb"
 				index={thumb.index}
-				class="relative size-3 rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50"
+				class="relative size-3 rounded-full bg-white transition-[box-shadow] block shrink-0 select-none disabled:pointer-events-none disabled:opacity-50 after:absolute after:-inset-2 shadow-[0_0_0_4px_color-mix(in_oklch,var(--primary),transparent_65%),0_0_10px_2px_color-mix(in_oklch,var(--primary),transparent_50%)]"
 			/>
 		{/each}
 	{/snippet}
