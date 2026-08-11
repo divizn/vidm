@@ -9,6 +9,7 @@ function baseInput(overrides: Partial<EditorSummaryInput> = {}): EditorSummaryIn
 		mode: 'none',
 		ratio: ASPECT_RATIOS[0],
 		speed: 1,
+		volume: 1,
 		compression: offCompression,
 		hasCaptionSegments: false,
 		trimStart: 0,
@@ -41,6 +42,18 @@ describe('buildExportSummary', () => {
 
 	it('excludes speed when left at the no-op 1x value', () => {
 		expect(buildExportSummary(baseInput({ speed: 1 }))).toEqual([]);
+	});
+
+	it('includes the volume percentage when volume is not 100%', () => {
+		expect(buildExportSummary(baseInput({ volume: 1.5 }))).toEqual(['150% volume']);
+	});
+
+	it('excludes volume when left at the no-op 100% value', () => {
+		expect(buildExportSummary(baseInput({ volume: 1 }))).toEqual([]);
+	});
+
+	it('rounds a fractional volume percentage', () => {
+		expect(buildExportSummary(baseInput({ volume: 0.325 }))).toEqual(['33% volume']);
 	});
 
 	it('names the matching preset when compression mode is preset', () => {
@@ -94,11 +107,12 @@ describe('buildExportSummary', () => {
 		]);
 	});
 
-	it('lists multiple active tools together, in trim/reformat/speed/compression/captions order', () => {
+	it('lists multiple active tools together, in trim/reformat/speed/volume/compression/captions order', () => {
 		const result = buildExportSummary(
 			baseInput({
 				mode: 'crop',
 				speed: 1.5,
+				volume: 0.5,
 				compression: DEFAULT_COMPRESSION,
 				hasCaptionSegments: true,
 				trimStart: 1,
@@ -109,6 +123,7 @@ describe('buildExportSummary', () => {
 			'Trim 0:01.0–0:09.0',
 			'Crop 9:16',
 			'1.50x speed',
+			'50% volume',
 			'Compression (Balanced)',
 			'Captions'
 		]);
