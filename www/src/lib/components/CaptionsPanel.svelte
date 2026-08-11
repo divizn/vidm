@@ -16,7 +16,8 @@
 		style = $bindable({ ...DEFAULT_CAPTION_STYLE }),
 		trimStart,
 		trimEnd,
-		sourceDuration
+		sourceDuration,
+		generating = $bindable(false)
 	}: {
 		file: File;
 		segments?: CaptionSegment[];
@@ -24,6 +25,12 @@
 		trimStart: number;
 		trimEnd: number;
 		sourceDuration: number;
+		// True while a transcription is in flight — lets the parent lock trim
+		// editing for the duration, since extractAudioForTranscription below
+		// captures trimStart/trimEnd once at the start of the run and a mid-flight
+		// trim change would silently desync the eventual transcript from the
+		// range it actually covers.
+		generating?: boolean;
 	} = $props();
 
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
@@ -112,6 +119,7 @@
 		progress = 0;
 		errorMessage = '';
 		clearedByTrimChange = false;
+		generating = true;
 
 		try {
 			const audioFile = await extractAudioForTranscription();
@@ -130,6 +138,8 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
+		} finally {
+			generating = false;
 		}
 	}
 </script>
