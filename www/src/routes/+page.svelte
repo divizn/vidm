@@ -57,14 +57,12 @@
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('trim');
-	// Captions transcribes against whatever the trim range is *at generate
-	// time* — jumping straight to Captions without ever looking at Trim
-	// risks transcribing the untrimmed video, then immediately invalidating
-	// that work the moment trim is actually set. Requiring one visit to the
-	// Trim tab first (it's also the default tab, so this is normally just
-	// "look before you leave") nudges the trim-then-caption order without
-	// forcing a specific trim value.
-	let hasVisitedTrim = $state(false);
+	// True while CaptionsPanel has a transcription in flight — locks trim
+	// editing for the duration (see CaptionsPanel's own `generating` prop
+	// comment): a mid-transcription trim change would silently desync the
+	// eventual transcript from the range it actually covers, since the
+	// extraction step captures trimStart/trimEnd once at the start of the run.
+	let captionsGenerating = $state(false);
 	let trimStart = $state(0);
 	// 0 doubles as "not yet initialized" until sourceDuration loads (see the
 	// $effect below) — TrimControl and buildExportSummary both treat
@@ -116,7 +114,8 @@
 			id: 'trim',
 			label: 'Trim',
 			icon: ScissorsIcon,
-			enabled: trimStart > 0 || trimEnd < sourceDuration
+			enabled: trimStart > 0 || trimEnd < sourceDuration,
+			disabledReason: captionsGenerating ? 'Captions are generating' : undefined
 		},
 		{ id: 'reformat', label: 'Reformat', icon: CropIcon, enabled: mode !== 'none' },
 		{ id: 'speed', label: 'Speed', icon: GaugeIcon, enabled: speed !== 1 },
@@ -131,8 +130,7 @@
 			id: 'captions',
 			label: 'Captions',
 			icon: CaptionsIcon,
-			enabled: captionSegments.length > 0,
-			disabledReason: hasVisitedTrim ? undefined : 'Check your trim range first'
+			enabled: captionSegments.length > 0
 		}
 	]);
 
@@ -145,16 +143,7 @@
 		sourceFile = file;
 		trimStart = 0;
 		trimEnd = 0; // re-derived once metadata loads, via the $effect above
-		hasVisitedTrim = false;
 		activeTool = 'trim';
-	}
-
-	// Marks trim as "visited" the moment the user navigates away from it —
-	// simply starting on the Trim tab (it's the default) isn't enough, since
-	// that's true before they've looked at anything.
-	function handleActiveChange(id: string) {
-		if (activeTool === 'trim' && id !== 'trim') hasVisitedTrim = true;
-		activeTool = id as ActiveTool;
 	}
 
 	async function run() {
@@ -258,7 +247,7 @@
 		<ToolTabs
 			tabs={toolTabs}
 			active={activeTool}
-			onActiveChange={handleActiveChange}
+			onActiveChange={(id) => (activeTool = id as ActiveTool)}
 		/>
 
 		<Card>
@@ -283,7 +272,7 @@
 		<Card>
 			<CardContent class="space-y-4">
 				<div class={activeTool === 'trim' ? 'space-y-4' : 'hidden'}>
-					<TrimControl bind:trimStart bind:trimEnd {sourceDuration} />
+					<TrimControl bind:trimStart bind:trimEnd {sourceDuration} disabled={captionsGenerating} />
 				</div>
 				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
 					<FormatToggle bind:mode />
@@ -303,6 +292,7 @@
 						file={sourceFile}
 						bind:segments={captionSegments}
 						bind:style={captionStyle}
+						bind:generating={captionsGenerating}
 						{trimStart}
 						{trimEnd}
 						{sourceDuration}

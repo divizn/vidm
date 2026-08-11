@@ -16,7 +16,8 @@
 		style = $bindable({ ...DEFAULT_CAPTION_STYLE }),
 		trimStart,
 		trimEnd,
-		sourceDuration
+		sourceDuration,
+		generating = $bindable(false)
 	}: {
 		file: File;
 		segments?: CaptionSegment[];
@@ -24,6 +25,12 @@
 		trimStart: number;
 		trimEnd: number;
 		sourceDuration: number;
+		// True while a transcription is in flight — lets the parent lock trim
+		// editing for the duration, since extractAudioForTranscription below
+		// captures trimStart/trimEnd once at the start of the run and a mid-flight
+		// trim change would silently desync the eventual transcript from the
+		// range it actually covers.
+		generating?: boolean;
 	} = $props();
 
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
@@ -37,14 +44,18 @@
 	// If trim changes after a transcript already exists, its timestamps no
 	// longer correspond to the new range — clear it rather than leaving it
 	// silently stale, same philosophy as editSegmentText dropping word-level
-	// timing on a manual edit.
+	// timing on a manual edit. clearedByTrimChange drives an explanatory
+	// message so this doesn't look like captions just vanished for no
+	// reason — reset the moment a fresh transcript exists again.
 	let prevTrimStart = trimStart;
 	let prevTrimEnd = trimEnd;
+	let clearedByTrimChange = $state(false);
 
 	$effect(() => {
 		if ((trimStart !== prevTrimStart || trimEnd !== prevTrimEnd) && segments.length > 0) {
 			segments = [];
 			status = 'idle';
+			clearedByTrimChange = true;
 		}
 		prevTrimStart = trimStart;
 		prevTrimEnd = trimEnd;
@@ -107,6 +118,8 @@
 		status = 'transcribing';
 		progress = 0;
 		errorMessage = '';
+		clearedByTrimChange = false;
+		generating = true;
 
 		try {
 			const audioFile = await extractAudioForTranscription();
@@ -125,12 +138,20 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
+		} finally {
+			generating = false;
 		}
 	}
 </script>
 
 {#if status === 'idle'}
-	<Button onclick={generate}>Generate captions</Button>
+	{#if clearedByTrimChange}
+		<p class="text-muted-foreground text-sm">
+			Trim changed since these captions were generated, so they no longer match — regenerate to
+			pick up the new range.
+		</p>
+	{/if}
+	<Button onclick={generate}>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button>
 	{#if trimActive}
 		<p class="text-muted-foreground text-sm">
 			Captions will be generated for the trimmed range ({formatTimecode(trimStart)}–{formatTimecode(
