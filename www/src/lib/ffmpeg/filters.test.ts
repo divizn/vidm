@@ -61,6 +61,7 @@ function baseOptions(overrides: Partial<ExportOptions> = {}): ExportOptions {
 	return {
 		mode: 'crop',
 		speed: 1,
+		volume: 1,
 		ratio: RATIO_9_16,
 		crop: CROP,
 		compression: DEFAULT_COMPRESSION,
@@ -131,6 +132,39 @@ describe('buildExportArgs', () => {
 		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 2 }));
 
 		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=2');
+	});
+
+	it('default volume (1) does not force an audio re-encode on its own', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ volume: 1 }));
+
+		expect(args).not.toContain('-filter:a');
+		expect(args).toContain('copy');
+	});
+
+	it('non-1 volume adds a volume filter and forces an audio re-encode', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ volume: 1.5 }));
+
+		expect(args).toContain('-filter:a');
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('volume=1.5');
+		expect(args).toContain('aac');
+		expect(args).not.toContain('copy');
+	});
+
+	it('combines speed and volume into a single comma-chained -filter:a', () => {
+		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions({ speed: 1.5, volume: 0.5 }));
+
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('atempo=1.5,volume=0.5');
+	});
+
+	it('volume alone still forces the "none" mode off its -c:v copy fast path\'s audio side', () => {
+		const args = buildExportArgs(
+			'in.mp4',
+			'out.mp4',
+			baseOptions({ mode: 'none', volume: 0, compression: { mode: 'none', crf: 23, targetMB: 10 } })
+		);
+
+		expect(args).toContain('-filter:a');
+		expect(args[args.indexOf('-filter:a') + 1]).toBe('volume=0');
 	});
 
 	it('compression "none" adds no -crf or -b:v', () => {
