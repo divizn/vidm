@@ -14,8 +14,11 @@
 		...restProps
 	}: WithoutChildrenOrChild<SliderPrimitive.RootProps> = $props();
 
+	// Deeper wedge than the first pass — thinner at the quiet end (0%), much
+	// thicker at the loud end (100%), for a more dramatic/visible cone shape
+	// now that the track has more height (h-12) to work with.
 	const WEDGE_CLIP =
-		'polygon(0% 62%, 100% 8%, 100% 92%, 0% 88%)';
+		'polygon(0% 58%, 100% 4%, 100% 96%, 0% 42%)';
 </script>
 
 <SliderPrimitive.Root
@@ -24,7 +27,7 @@
 	data-slot="volume-slider"
 	orientation="horizontal"
 	class={cn(
-		'relative flex h-8 w-full touch-none items-center select-none data-disabled:opacity-50',
+		'relative flex h-12 w-full touch-none items-center select-none data-disabled:opacity-50',
 		className
 	)}
 	{...restProps}
