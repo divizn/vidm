@@ -1,5 +1,12 @@
 <script lang="ts">
-	import { computeOutputDimensions, type AspectRatio, type CropRegion } from '$lib/ffmpeg/filters';
+	import {
+		computeOutputDimensions,
+		MIN_TRIM_DURATION_SECONDS,
+		type AspectRatio,
+		type CropRegion
+	} from '$lib/ffmpeg/filters';
+	import PlayIcon from '@lucide/svelte/icons/play';
+	import PauseIcon from '@lucide/svelte/icons/pause';
 
 	let {
 		file,
@@ -9,8 +16,8 @@
 		sourceWidth = $bindable(0),
 		sourceHeight = $bindable(0),
 		sourceDuration = $bindable(0),
-		trimStart = 0,
-		trimEnd = 0,
+		trimStart = $bindable(0),
+		trimEnd = $bindable(0),
 		clampToTrim = false,
 		speed = 1,
 		volume = 1
@@ -214,18 +221,107 @@
 	function clamp01(n: number): number {
 		return Math.min(1, Math.max(0, n));
 	}
+
+	// Custom play/pause overlay replaces the native <video controls> bar —
+	// this app only needs start/stop, not a scrubber or volume UI (volume
+	// has its own dedicated tool tab; scrubbing precision comes from the
+	// trim handles/mm:ss inputs instead).
+	let isPaused = $state(true);
+
+	function togglePlay() {
+		if (!videoEl) return;
+		if (videoEl.paused) videoEl.play();
+		else videoEl.pause();
+	}
+
+	// Trim handles, dragged directly on the video frame — mirrors the crop
+	// box's own onPointerDown/Move/Up + setPointerCapture pattern above, so
+	// dragging tracks the pointer even once it leaves the thin handle.
+	let trimStripEl: HTMLDivElement | undefined = $state();
+	let draggingTrimHandle: 'start' | 'end' | null = null;
+	let trimStripRect: DOMRect | undefined;
+
+	function onTrimHandlePointerDown(handle: 'start' | 'end', e: PointerEvent) {
+		if (!trimStripEl) return;
+		draggingTrimHandle = handle;
+		trimStripRect = trimStripEl.getBoundingClientRect();
+		(e.target as HTMLElement).setPointerCapture(e.pointerId);
+	}
+
+	function onTrimHandlePointerMove(e: PointerEvent) {
+		if (!draggingTrimHandle || !trimStripRect || !sourceDuration) return;
+		const frac = clamp01((e.clientX - trimStripRect.left) / trimStripRect.width);
+		const time = frac * sourceDuration;
+		if (draggingTrimHandle === 'start') {
+			trimStart = Math.max(0, Math.min(time, trimEnd - MIN_TRIM_DURATION_SECONDS));
+		} else {
+			trimEnd = Math.min(sourceDuration, Math.max(time, trimStart + MIN_TRIM_DURATION_SECONDS));
+		}
+	}
+
+	function onTrimHandlePointerUp() {
+		draggingTrimHandle = null;
+	}
 </script>
 
-<div class="relative mx-auto max-w-[480px]">
+<div class="group relative mx-auto max-w-[480px]">
 	<video
 		bind:this={videoEl}
 		src={objectUrl}
 		onloadedmetadata={onLoadedMetadata}
 		ontimeupdate={onTimeUpdate}
-		controls
+		onplay={() => (isPaused = false)}
+		onpause={() => (isPaused = true)}
 		playsinline
 		class="block w-full rounded-md"
 	></video>
+	<button
+		type="button"
+		onclick={togglePlay}
+		class={`absolute inset-0 m-auto flex size-14 items-center justify-center rounded-full bg-black/50 text-white transition-opacity focus-visible:opacity-100 focus-visible:outline-hidden ${isPaused ? 'opacity-90' : 'opacity-0 group-hover:opacity-90'}`}
+		aria-label={isPaused ? 'Play' : 'Pause'}
+	>
+		{#if isPaused}
+			<PlayIcon class="size-6" />
+		{:else}
+			<PauseIcon class="size-6" />
+		{/if}
+	</button>
+	{#if clampToTrim && sourceDuration}
+		<div
+			bind:this={trimStripEl}
+			class="absolute inset-x-0 bottom-0 h-8 touch-none"
+		>
+			<div class="absolute inset-0 bg-black/35"></div>
+			<div
+				class="absolute inset-y-0 left-0 bg-black/55"
+				style:width={`${(trimStart / sourceDuration) * 100}%`}
+			></div>
+			<div
+				class="absolute inset-y-0 right-0 bg-black/55"
+				style:left={`${(trimEnd / sourceDuration) * 100}%`}
+			></div>
+			<div
+				class="border-primary bg-primary/20 absolute inset-y-0 border-t-2"
+				style:left={`${(trimStart / sourceDuration) * 100}%`}
+				style:width={`${((trimEnd - trimStart) / sourceDuration) * 100}%`}
+			></div>
+			<div
+				class="bg-primary absolute -top-1.5 -bottom-1.5 w-1.5 touch-none rounded-full shadow-[0_0_6px_rgba(0,0,0,0.6)] cursor-ew-resize"
+				style:left={`${(trimStart / sourceDuration) * 100}%`}
+				onpointerdown={(e) => onTrimHandlePointerDown('start', e)}
+				onpointermove={onTrimHandlePointerMove}
+				onpointerup={onTrimHandlePointerUp}
+			></div>
+			<div
+				class="bg-primary absolute -top-1.5 -bottom-1.5 w-1.5 touch-none rounded-full shadow-[0_0_6px_rgba(0,0,0,0.6)] cursor-ew-resize"
+				style:left={`${(trimEnd / sourceDuration) * 100}%`}
+				onpointerdown={(e) => onTrimHandlePointerDown('end', e)}
+				onpointermove={onTrimHandlePointerMove}
+				onpointerup={onTrimHandlePointerUp}
+			></div>
+		</div>
+	{/if}
 	{#if showCropBox && sourceWidth}
 		<div
 			class="border-primary bg-primary/20 absolute cursor-grab touch-none border-2 active:cursor-grabbing"

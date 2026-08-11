@@ -271,8 +271,8 @@
 					bind:sourceWidth
 					bind:sourceHeight
 					bind:sourceDuration
-					{trimStart}
-					{trimEnd}
+					bind:trimStart
+					bind:trimEnd
 					clampToTrim={activeTool === 'trim'}
 					{speed}
 					{volume}

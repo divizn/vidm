@@ -1,7 +1,6 @@
 <script lang="ts">
 	import { MIN_TRIM_DURATION_SECONDS } from '$lib/ffmpeg/filters';
 	import { formatTimecode, parseTimecode } from '$lib/timecode';
-	import { Slider } from '$lib/components/ui/slider';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
 
@@ -16,15 +15,6 @@
 		sourceDuration: number;
 		disabled?: boolean;
 	} = $props();
-
-	const TRIM_STEP = 0.1;
-
-	function onSliderChange(value: number[]) {
-		const [start, end] = value;
-		if (end - start < MIN_TRIM_DURATION_SECONDS) return;
-		trimStart = start;
-		trimEnd = end;
-	}
 
 	// Text inputs are one-way (value= not bind:value=) and commit on
 	// change/blur rather than every keystroke — re-formatting the field on
@@ -46,15 +36,9 @@
 
 <fieldset {disabled} class="space-y-3">
 	<legend class="mb-1 text-sm font-semibold">Trim</legend>
-	<Slider
-		type="multiple"
-		min={0}
-		max={sourceDuration}
-		step={TRIM_STEP}
-		value={[trimStart, trimEnd]}
-		onValueChange={onSliderChange}
-		{disabled}
-	/>
+	<p class="text-muted-foreground text-sm">
+		Drag the handles directly on the video above, or type exact times below.
+	</p>
 	<div class="flex flex-wrap items-center gap-3">
 		<Label for="trim-start" class="font-normal">Start:</Label>
 		<Input
