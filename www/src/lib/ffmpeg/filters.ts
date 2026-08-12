@@ -117,14 +117,22 @@ const AUDIO_BITRATE_KBPS = 128;
 // encoder runs there at all.
 const X264_PRESET = 'veryfast';
 
-// The multi-threaded WASM core has a fixed-size pthread pool. A plain crop
-// at 1x fits within it using libx264's default threading. But anything that
-// adds a second concurrent pipeline — blur-pad's dual video streams
-// (background blur + foreground overlay), or an audio encoder running
-// alongside the video encoder — can exhaust the pool and deadlock silently
-// (pthread_create() blocks forever waiting for a worker that never frees
-// up). Capping libx264's own thread count leaves the pool enough headroom
-// for the other pipeline(s) to actually get a worker.
+// The multi-threaded WASM core has a fixed-size pthread pool, and left to
+// itself libx264 sizes its thread count from the machine's core count
+// (e.g. `threads=6 lookahead_threads=2` on an 8-core host). That can
+// outrun what the pool can actually hand out, which fails in one of two
+// ways: a silent deadlock (pthread_create() blocks forever waiting for a
+// worker that never frees up), or the main thread throwing Emscripten's
+// `unwind` when it can't satisfy a spawn synchronously.
+//
+// So every re-encode gets a cap, not just the ones with a second
+// concurrent pipeline. This was originally conditional on `extraPipelines`
+// (blur-pad's dual video streams, an audio encoder, libass) on the theory
+// that a lone encoder always fits — confirmed wrong in practice: crop +
+// CRF compression with no other pipeline still died at libx264 init with
+// `unwind`. Extra pipelines still tighten the cap further, since they need
+// their own workers out of the same pool.
+const THREADS_FOR_NO_EXTRA_PIPELINE = 4;
 const THREADS_FOR_SINGLE_EXTRA_PIPELINE = 4;
 const THREADS_FOR_TWO_EXTRA_PIPELINES = 2;
 
@@ -215,13 +223,17 @@ export function buildExportArgs(
 	// applies for the same reason).
 	const needsAudioReencode =
 		needsSpeedFilters || needsVolumeFilter || compression.mode === 'size' || trimIsActive;
-	const extraPipelines = (mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0);
+	// libass runs its own shaping/rendering work alongside the encoder, so
+	// burned-in captions count as a concurrent pipeline for thread-budget
+	// purposes just like blur-pad or an audio encoder do. Confirmed needed:
+	// crop + CRF + captions (no blur-pad, no audio re-encode) left the
+	// encoder uncapped at libx264's auto-detected 8 threads
+	// (`threads=6 lookahead_threads=2`) and died immediately after encoder
+	// init with Emscripten's `unwind` throw — the main thread trying to
+	// spawn a pthread the worker pool couldn't satisfy.
+	const extraPipelines =
+		(mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0) + (captionsAssPath ? 1 : 0);
 
-	// Confirmed the `ass` filter alone (plain crop, no other concurrent
-	// pipeline) does not trigger the pthread-pool deadlock described above —
-	// exec resolved quickly against a real MP4 output. Not yet verified in
-	// combination with blur-pad + speed + captions all at once; if that
-	// combo hangs, treat captions as another `extraPipelines` contributor.
 	const captionsSuffix = captionsAssPath ? `,ass=${captionsAssPath}:fontsdir=${captionsFontsDir}` : '';
 
 	const { width: outW, height: outH } = computeOutputDimensions({
@@ -324,13 +336,16 @@ export function buildExportArgs(
 	// compression.mode is 'none' *and* trim is inactive too, so it never
 	// conflicts with -crf/-b:v.
 
-	if (extraPipelines > 0) {
-		args.push(
-			'-threads',
+	// Only meaningful when an encoder actually runs — the -c:v copy fast
+	// path spawns no encoder threads to cap.
+	if (videoIsReencoded) {
+		const threadCap =
 			extraPipelines >= 2
-				? String(THREADS_FOR_TWO_EXTRA_PIPELINES)
-				: String(THREADS_FOR_SINGLE_EXTRA_PIPELINE)
-		);
+				? THREADS_FOR_TWO_EXTRA_PIPELINES
+				: extraPipelines === 1
+					? THREADS_FOR_SINGLE_EXTRA_PIPELINE
+					: THREADS_FOR_NO_EXTRA_PIPELINE;
+		args.push('-threads', String(threadCap));
 	}
 
 	args.push(outputName);
