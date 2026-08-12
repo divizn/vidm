@@ -39,10 +39,12 @@ function download(url, dest) {
 		https
 			.get(url, (res) => {
 				if (res.statusCode === 302 || res.statusCode === 301) {
+					res.resume();
 					download(res.headers.location, dest).then(resolve, reject);
 					return;
 				}
 				if (res.statusCode !== 200) {
+					res.resume();
 					reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
 					return;
 				}
