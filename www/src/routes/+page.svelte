@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { fetchFile } from '@ffmpeg/util';
-	import { loadFFmpeg } from '$lib/ffmpeg/client';
+	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { exportResult } from '$lib/export-state.svelte';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import {
@@ -219,6 +219,11 @@
 		} catch (err) {
 			status = 'error';
 			errorMessage = err instanceof Error ? err.message : String(err);
+			// A failed ffmpeg call can leave the shared module instance
+			// permanently broken (see resetFFmpeg's own comment) — without
+			// this, retrying export would keep reusing the same dead
+			// instance and fail again with an unrelated-looking error.
+			resetFFmpeg();
 		}
 	}
 </script>

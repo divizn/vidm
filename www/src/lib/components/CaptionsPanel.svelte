@@ -3,7 +3,7 @@
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
-	import { loadFFmpeg } from '$lib/ffmpeg/client';
+	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { fetchFile } from '@ffmpeg/util';
 	import { formatTimecode } from '$lib/timecode';
 	import { Button } from '$lib/components/ui/button';
@@ -152,6 +152,16 @@
 				offsetSeconds: i * TRANSCRIBE_CHUNK_SECONDS
 			});
 		}
+
+		// This ffmpeg instance is shared with (and outlives this call into)
+		// the main export flow — leaving these behind on its virtual FS just
+		// adds unnecessary memory pressure for whatever runs next, so clean
+		// up now that the chunk data has been copied out into `chunks`.
+		await ffmpeg.deleteFile(inputName);
+		for (const name of chunkNames) {
+			await ffmpeg.deleteFile(name);
+		}
+
 		return chunks;
 	}
 
@@ -181,6 +191,11 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
+			// A failed ffmpeg call can leave the shared module instance
+			// permanently broken (see resetFFmpeg's own comment) — without
+			// this, Retry would keep reusing the same dead instance and
+			// fail again with an unrelated-looking error.
+			resetFFmpeg();
 		} finally {
 			generating = false;
 		}
