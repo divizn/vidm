@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { transcribeChunks, TRANSCRIBE_CHUNK_SECONDS, type AudioChunk } from '$lib/whisper/client';
+	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
@@ -39,7 +40,9 @@
 
 	let status = $state<Status>(segments.length ? 'done' : 'idle');
 	let progress = $state(0);
+	let startedAt = $state(0);
 	let errorMessage = $state('');
+	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
 
 	// If trim changes after a transcript already exists, its timestamps no
 	// longer correspond to the new range — clear it rather than leaving it
@@ -68,6 +71,21 @@
 	);
 
 	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
+	let transcriptExpanded = $state(false);
+	let transcriptEl = $state<HTMLParagraphElement | undefined>(undefined);
+	// Only worth offering "show more" when the clamped paragraph is actually
+	// truncating something — scrollHeight exceeds clientHeight once
+	// line-clamp kicks in, but not for a transcript that already fits.
+	let transcriptOverflows = $state(false);
+	$effect(() => {
+		// Re-measure whenever the transcript text or clamp state changes —
+		// clientHeight only reflects the clamped 4-line box while collapsed.
+		transcript;
+		transcriptExpanded;
+		if (transcriptEl) {
+			transcriptOverflows = transcriptEl.scrollHeight > transcriptEl.clientHeight;
+		}
+	});
 
 	function editSegmentText(index: number, text: string) {
 		// Editing invalidates that segment's word-level timing (it no longer
@@ -140,8 +158,10 @@
 	async function generate() {
 		status = 'transcribing';
 		progress = 0;
+		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
+		transcriptExpanded = false;
 		generating = true;
 
 		try {
@@ -183,7 +203,9 @@
 		</p>
 	{/if}
 {:else if status === 'transcribing'}
-	<p class="text-muted-foreground text-sm">Transcribing… {progress}%</p>
+	<p class="text-muted-foreground text-sm">
+		Transcribing… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
+	</p>
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	<Button onclick={generate}>Retry</Button>
@@ -192,7 +214,21 @@
 {#if status === 'done'}
 	<div class="space-y-1">
 		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
-		<p class="text-sm whitespace-pre-wrap">{transcript}</p>
+		<p
+			bind:this={transcriptEl}
+			class="text-sm whitespace-pre-wrap {transcriptExpanded ? '' : 'line-clamp-4'}"
+		>
+			{transcript}
+		</p>
+		{#if transcriptOverflows || transcriptExpanded}
+			<Button
+				variant="link"
+				class="h-auto p-0 text-xs"
+				onclick={() => (transcriptExpanded = !transcriptExpanded)}
+			>
+				{transcriptExpanded ? 'Show less' : 'Show more'}
+			</Button>
+		{/if}
 	</div>
 	<ul class="max-h-64 space-y-2 overflow-y-auto">
 		{#each segments as segment, i (i)}
