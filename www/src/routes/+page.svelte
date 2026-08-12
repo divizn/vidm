@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { fetchFile } from '@ffmpeg/util';
-	import { loadFFmpeg } from '$lib/ffmpeg/client';
+	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { exportResult } from '$lib/export-state.svelte';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import {
@@ -219,6 +219,7 @@
 		} catch (err) {
 			status = 'error';
 			errorMessage = err instanceof Error ? err.message : String(err);
+			resetFFmpeg();
 		}
 	}
 </script>
@@ -275,7 +276,9 @@
 				</div>
 				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
 					<FormatToggle bind:mode />
-					<RatioSelector bind:ratio />
+					{#if mode !== 'none'}
+						<RatioSelector bind:ratio />
+					{/if}
 				</div>
 				<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
 					<SpeedControl bind:speed />

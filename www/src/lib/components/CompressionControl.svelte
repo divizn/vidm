@@ -79,7 +79,7 @@
 			<span class="text-muted-foreground text-sm">Approximate, not exact — single-pass encode.</span
 			>
 		</div>
-	{:else}
+	{:else if compression.mode === 'custom'}
 		<div class="space-y-1.5">
 			<div class="flex items-center gap-3">
 				<Label for="crf-slider" class="font-normal">CRF:</Label>

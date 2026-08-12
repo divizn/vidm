@@ -3,7 +3,7 @@
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
-	import { loadFFmpeg } from '$lib/ffmpeg/client';
+	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { fetchFile } from '@ffmpeg/util';
 	import { formatTimecode } from '$lib/timecode';
 	import { Button } from '$lib/components/ui/button';
@@ -73,13 +73,8 @@
 	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
 	let transcriptExpanded = $state(false);
 	let transcriptEl = $state<HTMLParagraphElement | undefined>(undefined);
-	// Only worth offering "show more" when the clamped paragraph is actually
-	// truncating something — scrollHeight exceeds clientHeight once
-	// line-clamp kicks in, but not for a transcript that already fits.
 	let transcriptOverflows = $state(false);
 	$effect(() => {
-		// Re-measure whenever the transcript text or clamp state changes —
-		// clientHeight only reflects the clamped 4-line box while collapsed.
 		transcript;
 		transcriptExpanded;
 		if (transcriptEl) {
@@ -152,6 +147,16 @@
 				offsetSeconds: i * TRANSCRIBE_CHUNK_SECONDS
 			});
 		}
+
+		// This ffmpeg instance is shared with (and outlives this call into)
+		// the main export flow — leaving these behind on its virtual FS just
+		// adds unnecessary memory pressure for whatever runs next, so clean
+		// up now that the chunk data has been copied out into `chunks`.
+		await ffmpeg.deleteFile(inputName);
+		for (const name of chunkNames) {
+			await ffmpeg.deleteFile(name);
+		}
+
 		return chunks;
 	}
 
@@ -181,6 +186,7 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
+			resetFFmpeg();
 		} finally {
 			generating = false;
 		}

@@ -249,9 +249,39 @@ describe('buildExportArgs', () => {
 		expect(args[args.indexOf('-threads') + 1]).toBe('2');
 	});
 
-	it('adds no -threads cap for a plain crop at 1x with no size-mode compression', () => {
+	// Regression: a lone encoder was assumed to fit the pthread pool without
+	// a cap, but crop + CRF compression died at libx264 init with an
+	// Emscripten `unwind` throw — every re-encode gets capped now.
+	it('caps encoder threads for a plain crop at 1x with no extra pipeline', () => {
 		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
-		expect(args).not.toContain('-threads');
+
+		expect(args).toContain('-threads');
+		expect(args[args.indexOf('-threads') + 1]).toBe('4');
+	});
+
+	// Regression: this combo (no blur-pad, no audio re-encode) left the
+	// encoder uncapped and died at libx264 init with an Emscripten `unwind`
+	// throw — libass counts as a concurrent pipeline too.
+	it('caps encoder threads when burning in captions', () => {
+		const args = buildExportArgs(
+			'in.mp4',
+			'out.mp4',
+			baseOptions({ captionsAssPath: 'captions.ass', captionsFontsDir: 'fonts' })
+		);
+
+		expect(args).toContain('-threads');
+		expect(args[args.indexOf('-threads') + 1]).toBe('4');
+	});
+
+	it('caps encoder threads harder for captions alongside another pipeline', () => {
+		const args = buildExportArgs(
+			'in.mp4',
+			'out.mp4',
+			baseOptions({ captionsAssPath: 'captions.ass', captionsFontsDir: 'fonts', speed: 1.5 })
+		);
+
+		expect(args).toContain('-threads');
+		expect(args[args.indexOf('-threads') + 1]).toBe('2');
 	});
 
 	describe('mode "none" (no reformat)', () => {
@@ -350,6 +380,15 @@ describe('buildExportArgs', () => {
 				baseOptions({ mode: 'none', compression: { mode: 'none', crf: 23, targetMB: 10 } })
 			);
 			expect(args).not.toContain('-preset');
+		});
+
+		it('never caps threads on the -c:v copy fast path — no encoder threads to cap', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.mp4',
+				baseOptions({ mode: 'none', compression: { mode: 'none', crf: 23, targetMB: 10 } })
+			);
+			expect(args).not.toContain('-threads');
 		});
 	});
 

@@ -20,6 +20,20 @@ export function loadFFmpeg(): Promise<FFmpeg> {
 	return ffmpegPromise;
 }
 
+// Call after any ffmpeg call (writeFile/exec/readFile/...) throws. A WASM
+// abort (e.g. an internal "unwind" exception escaping ffmpeg's native
+// code) leaves the module instance permanently broken — every later call
+// on it keeps failing too, generically, which is what turns a single real
+// failure into "works the first time, then every retry fails" (retrying
+// via loadFFmpeg() would otherwise keep handing back this same dead
+// instance since it's cached above). Dropping the cache makes the next
+// loadFFmpeg() call spin up a genuinely fresh module instead.
+export function resetFFmpeg(): void {
+	const dead = ffmpegPromise;
+	ffmpegPromise = null;
+	dead?.then((ffmpeg) => ffmpeg.terminate()).catch(() => {});
+}
+
 async function loadFFmpegInstance(): Promise<FFmpeg> {
 	const ffmpeg = new FFmpeg();
 	ffmpeg.on('log', ({ message }) => console.debug('[ffmpeg]', message));
