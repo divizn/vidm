@@ -73,13 +73,8 @@
 	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
 	let transcriptExpanded = $state(false);
 	let transcriptEl = $state<HTMLParagraphElement | undefined>(undefined);
-	// Only worth offering "show more" when the clamped paragraph is actually
-	// truncating something — scrollHeight exceeds clientHeight once
-	// line-clamp kicks in, but not for a transcript that already fits.
 	let transcriptOverflows = $state(false);
 	$effect(() => {
-		// Re-measure whenever the transcript text or clamp state changes —
-		// clientHeight only reflects the clamped 4-line box while collapsed.
 		transcript;
 		transcriptExpanded;
 		if (transcriptEl) {
@@ -191,10 +186,6 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
-			// A failed ffmpeg call can leave the shared module instance
-			// permanently broken (see resetFFmpeg's own comment) — without
-			// this, Retry would keep reusing the same dead instance and
-			// fail again with an unrelated-looking error.
 			resetFFmpeg();
 		} finally {
 			generating = false;

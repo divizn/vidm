@@ -219,10 +219,6 @@
 		} catch (err) {
 			status = 'error';
 			errorMessage = err instanceof Error ? err.message : String(err);
-			// A failed ffmpeg call can leave the shared module instance
-			// permanently broken (see resetFFmpeg's own comment) — without
-			// this, retrying export would keep reusing the same dead
-			// instance and fail again with an unrelated-looking error.
 			resetFFmpeg();
 		}
 	}
