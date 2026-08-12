@@ -280,7 +280,9 @@
 				</div>
 				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
 					<FormatToggle bind:mode />
-					<RatioSelector bind:ratio />
+					{#if mode !== 'none'}
+						<RatioSelector bind:ratio />
+					{/if}
 				</div>
 				<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
 					<SpeedControl bind:speed />
