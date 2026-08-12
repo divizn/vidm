@@ -3,6 +3,7 @@
 	import { fetchFile } from '@ffmpeg/util';
 	import { loadFFmpeg } from '$lib/ffmpeg/client';
 	import { exportResult } from '$lib/export-state.svelte';
+	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import {
 		buildExportArgs,
 		computeOutputDimensions,
@@ -52,7 +53,9 @@
 
 	let status = $state<Status>('configuring');
 	let progress = $state(0);
+	let processingStartedAt = $state(0);
 	let errorMessage = $state('');
+	const etaSeconds = $derived(estimateRemainingSeconds(processingStartedAt, progress));
 	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
 	let speed = $state(1);
@@ -155,6 +158,7 @@
 			});
 
 			status = 'processing';
+			processingStartedAt = Date.now();
 
 			const inputName = 'input.mp4';
 			const outputName = 'output.mp4';
@@ -312,7 +316,9 @@
 	{#if status === 'loading-engine'}
 		<p class="text-muted-foreground text-sm">Loading FFmpeg engine…</p>
 	{:else if status === 'processing'}
-		<p class="text-muted-foreground text-sm">Reformatting… {progress}%</p>
+		<p class="text-muted-foreground text-sm">
+			Reformatting… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
+		</p>
 	{:else if status === 'error'}
 		<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	{/if}
