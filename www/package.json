@@ -16,6 +16,7 @@
 	"dependencies": {
 		"@ffmpeg/ffmpeg": "^0.12.15",
 		"@ffmpeg/util": "^0.12.2",
+		"@huggingface/transformers": "4.2.0",
 		"@lucide/svelte": "^1.30.0",
 		"@transcribe/shout": "^1.0.7",
 		"@transcribe/transcriber": "^3.0.1",
