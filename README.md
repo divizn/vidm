@@ -13,16 +13,12 @@ Status).
 
 ```
 www/         SvelteKit app — the actual tool (start here)
-api/         Go HTTP server — reserved for a later, separate auth phase
-internal/    Go packages (auth/store/video) — reserved, empty stub
-engine/      Rust-wasm stub — reserved placeholder
+Makefile     Thin wrapper around the pnpm scripts in www/
 ```
 
-`api/`, `internal/`, `go.mod`, and `engine/` are not part of the
-client-side roadmap and aren't built yet — they're reserved for a later,
-separate phase (user accounts/auth via Go + Goth, and possibly
-cross-device project sync). See [CLAUDE.md](./CLAUDE.md) for the full
-spec, architecture, and roadmap.
+The whole tool lives in `www/`. There is no backend — video never leaves
+the browser. See [CLAUDE.md](./CLAUDE.md) for the full spec,
+architecture, and roadmap.
 
 ## Setup
 
