@@ -6,6 +6,19 @@ export function estimateRemainingSeconds(startedAt: number, progressPercent: num
 	return remainingMs / 1000;
 }
 
+// Exponential moving average of seconds-per-chunk. A cumulative mean weights a
+// slow first chunk equally with everything after it and adapts to a real change
+// in throughput (throttling, a busy machine) only very slowly.
+export function emaNext(previous: number | null, sample: number, smoothing = 0.3): number {
+	return previous === null ? sample : smoothing * sample + (1 - smoothing) * previous;
+}
+
+// Chunks are uniform, so remaining work is measured in chunks rather than
+// percentage points. `chunksRemaining` may be fractional for a part-done chunk.
+export function remainingFromChunks(secondsPerChunk: number, chunksRemaining: number): number {
+	return Math.max(0, secondsPerChunk * Math.max(0, chunksRemaining));
+}
+
 // Progress arrives in coarse steps (one per audio chunk), and the longer the
 // video the less each step is worth, so a label recomputed only on progress can
 // sit unchanged for 10+ seconds and read as frozen. Counting the last estimate

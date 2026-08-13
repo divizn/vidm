@@ -8,7 +8,13 @@
 	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
-	import { countdownSeconds, estimateRemainingSeconds, formatEta } from '$lib/eta';
+	import {
+		countdownSeconds,
+		emaNext,
+		estimateRemainingSeconds,
+		formatEta,
+		remainingFromChunks
+	} from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
@@ -229,6 +235,9 @@
 			// extrapolating from them made early estimates absurd: a run showing
 			// 3% reported ~51 minutes remaining.
 			let timingTranscription = false;
+			let secondsPerChunk: number | null = null;
+			let lastChunkIndex = -1;
+			let lastChunkBoundaryAt = 0;
 			const onProgress = (update: TranscribeProgress) => {
 				if (update.phase === 'downloading') {
 					downloadPercent = Math.round(update.percent);
@@ -240,8 +249,33 @@
 						startedAt = Date.now();
 					}
 					progress = Math.round(update.percent);
+
+					// Time completed chunks and smooth them, rather than extrapolating
+					// from total elapsed: a cumulative mean stays anchored to the first
+					// chunk and barely reacts when the machine slows down.
+					const at = Date.now();
+					if (update.chunkIndex !== undefined && update.chunkCount) {
+						if (update.chunkIndex > lastChunkIndex) {
+							if (lastChunkIndex >= 0) {
+								secondsPerChunk = emaNext(secondsPerChunk, (at - lastChunkBoundaryAt) / 1000);
+							}
+							lastChunkIndex = update.chunkIndex;
+							lastChunkBoundaryAt = at;
+						}
+						if (secondsPerChunk !== null) {
+							const chunksDone = (update.percent / 100) * update.chunkCount;
+							etaEstimate = {
+								seconds: remainingFromChunks(secondsPerChunk, update.chunkCount - chunksDone),
+								at
+							};
+							return;
+						}
+					}
+
+					// Until a full chunk has been timed there is nothing to smooth, so
+					// fall back to extrapolating from elapsed time.
 					const remaining = estimateRemainingSeconds(startedAt, progress);
-					if (remaining !== null) etaEstimate = { seconds: remaining, at: Date.now() };
+					if (remaining !== null) etaEstimate = { seconds: remaining, at };
 				}
 			};
 

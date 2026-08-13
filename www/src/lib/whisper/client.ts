@@ -61,9 +61,15 @@ function wordsFromTokens(tokens: TranscribeToken[]): CaptionWord[] {
 // (loading the model per chunk would dwarf the cost of transcribing it), then
 // merges the results into one segment list with each chunk's timestamps
 // shifted back onto the original, unchunked timeline.
+export interface ChunkProgress {
+	percent: number;
+	chunkIndex: number;
+	chunkCount: number;
+}
+
 export async function transcribeChunks(
 	chunks: AudioChunk[],
-	onProgress?: (percent: number) => void
+	onProgress?: (progress: ChunkProgress) => void
 ): Promise<CaptionSegment[]> {
 	cpuLog.clear();
 	console.info(
@@ -94,7 +100,11 @@ export async function transcribeChunks(
 		for (let i = 0; i < chunks.length; i++) {
 			const { file, offsetSeconds } = chunks[i];
 			transcriber.onProgress = (chunkPercent: number) => {
-				onProgress?.(Math.round(((i + chunkPercent / 100) / chunks.length) * 100));
+				onProgress?.({
+					percent: Math.round(((i + chunkPercent / 100) / chunks.length) * 100),
+					chunkIndex: i,
+					chunkCount: chunks.length
+				});
 			};
 
 			const result = await transcriber.transcribe(file, { lang: 'en' });

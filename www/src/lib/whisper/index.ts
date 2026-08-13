@@ -53,14 +53,14 @@ export async function transcribe(
 			console.warn('[vidm:whisper] GPU transcription failed, falling back to CPU:', err);
 			if (!onFallback) throw err;
 			const chunks = await onFallback();
-			return transcribeChunks(chunks, (percent) =>
-				onProgress?.({ phase: 'transcribing', percent })
+			return transcribeChunks(chunks, (update) =>
+				onProgress?.({ phase: 'transcribing', ...update })
 			);
 		}
 	}
 
-	return transcribeChunks(input.chunks, (percent) =>
-		onProgress?.({ phase: 'transcribing', percent })
+	return transcribeChunks(input.chunks, (update) =>
+		onProgress?.({ phase: 'transcribing', ...update })
 	);
 }
 

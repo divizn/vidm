@@ -135,14 +135,25 @@ describe('transcribe', () => {
 	});
 
 	it('forwards transcribeChunks progress as phase "transcribing"', async () => {
-		mocks.transcribeChunks.mockImplementation(async (_chunks: AudioChunk[], onPercent: (p: number) => void) => {
-			onPercent(42);
-			return segments;
-		});
+		mocks.transcribeChunks.mockImplementation(
+			async (
+				_chunks: AudioChunk[],
+				onChunk: (p: { percent: number; chunkIndex: number; chunkCount: number }) => void
+			) => {
+				onChunk({ percent: 42, chunkIndex: 3, chunkCount: 8 });
+				return segments;
+			}
+		);
 		const onProgress = vi.fn();
 
 		await transcribe({ backend: 'wasm', chunks: [chunk('a.wav')] }, onProgress);
 
-		expect(onProgress).toHaveBeenCalledWith({ phase: 'transcribing', percent: 42 });
+		// chunkIndex/chunkCount must survive: the ETA estimator times whole chunks.
+		expect(onProgress).toHaveBeenCalledWith({
+			phase: 'transcribing',
+			percent: 42,
+			chunkIndex: 3,
+			chunkCount: 8
+		});
 	});
 });
