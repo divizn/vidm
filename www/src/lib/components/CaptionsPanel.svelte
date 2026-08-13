@@ -2,17 +2,13 @@
 	import {
 		pickBackend,
 		transcribe,
-		backendLabel,
-		explainBackend,
-		isFixableByUser,
 		TRANSCRIBE_CHUNK_SECONDS,
 		type TranscribeProgress,
-		type BackendSelection,
 		type TranscriptionQuality
 	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
-	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
+	import { countdownSeconds, estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
@@ -57,14 +53,24 @@
 	// itself with no progress signal.
 	let downloadPercent = $state(0);
 	let startedAt = $state(0);
+	// Setup (ffmpeg load, audio extraction, whisper model load) dominates a short
+	// clip and reports no percentage, so name the phase instead of sitting at 0%.
+	let stage = $state<'preparing' | 'transcribing'>('preparing');
 	let errorMessage = $state('');
-	// Which engine this run picked, and why. Null until the first run resolves
-	// it — there is nothing honest to display before detection has happened.
-	let engine = $state<BackendSelection | null>(null);
 	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
 	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
 	let quality = $state<TranscriptionQuality>('quality');
-	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
+	let etaEstimate = $state<{ seconds: number; at: number } | null>(null);
+	let now = $state(Date.now());
+	const etaSeconds = $derived(
+		etaEstimate ? countdownSeconds(etaEstimate.seconds, etaEstimate.at, now) : null
+	);
+
+	$effect(() => {
+		if (status !== 'transcribing') return;
+		const id = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(id);
+	});
 
 	// If trim changes after a transcript already exists, its timestamps no
 	// longer correspond to the new range — clear it rather than leaving it
@@ -91,18 +97,6 @@
 			? URL.createObjectURL(new Blob([toSrt(segments)], { type: 'text/plain' }))
 			: null
 	);
-
-	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
-	let transcriptExpanded = $state(false);
-	let transcriptEl = $state<HTMLParagraphElement | undefined>(undefined);
-	let transcriptOverflows = $state(false);
-	$effect(() => {
-		transcript;
-		transcriptExpanded;
-		if (transcriptEl) {
-			transcriptOverflows = transcriptEl.scrollHeight > transcriptEl.clientHeight;
-		}
-	});
 
 	function editSegmentText(index: number, text: string) {
 		// Editing invalidates that segment's word-level timing (it no longer
@@ -220,18 +214,15 @@
 		status = 'transcribing';
 		progress = 0;
 		downloadPercent = 0;
+		stage = 'preparing';
+		etaEstimate = null;
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
-		transcriptExpanded = false;
 		generating = true;
 
 		try {
 			const selection = await pickBackend();
-			// Surfaced in the UI, not just the console: "why did this run on CPU"
-			// was unanswerable without devtools, and the most common cause
-			// (hardware acceleration switched off) is one the user can fix.
-			engine = selection;
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
 			// shader compilation — one-off costs that don't recur per percent, so
@@ -245,9 +236,12 @@
 					downloadPercent = 100;
 					if (!timingTranscription) {
 						timingTranscription = true;
+						stage = 'transcribing';
 						startedAt = Date.now();
 					}
 					progress = Math.round(update.percent);
+					const remaining = estimateRemainingSeconds(startedAt, progress);
+					if (remaining !== null) etaEstimate = { seconds: remaining, at: Date.now() };
 				}
 			};
 
@@ -270,9 +264,8 @@
 								startedAt = Date.now();
 								downloadPercent = 0;
 								progress = 0;
-								// The badge claimed GPU; the run is finishing on CPU. Say
-								// so rather than leaving a stale, now-wrong label up.
-								engine = { backend: 'wasm', reason: 'adapter-error' };
+								stage = 'preparing';
+								etaEstimate = null;
 								return extractAudioChunksForTranscription();
 							}
 						)
@@ -322,51 +315,21 @@
 			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
 		</p>
 	{/if}
-	<p class="text-muted-foreground text-sm">
-		Transcribing{engine ? ` on ${backendLabel(engine)}` : ''}… {progress}%{etaSeconds !== null
-			? `, about ${formatEta(etaSeconds)} remaining`
-			: ''}
-	</p>
-	{@render engineHint()}
+	{#if stage === 'preparing'}
+		<p class="text-muted-foreground text-sm">Preparing audio…</p>
+	{:else}
+		<p class="text-muted-foreground text-sm">
+			Transcribing…{progress > 0 ? ` ${progress}%` : ''}{etaSeconds !== null
+				? `, about ${formatEta(etaSeconds)} remaining`
+				: ''}
+		</p>
+	{/if}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	<Button onclick={generate}>Retry</Button>
 {/if}
 
-{#snippet engineHint()}
-	{#if engine && isFixableByUser(engine)}
-		<p class="text-muted-foreground text-sm">
-			Running on CPU because no GPU was available. Turning on hardware acceleration in your
-			browser settings, then reloading, will make transcription substantially faster.
-		</p>
-	{/if}
-{/snippet}
-
 {#if status === 'done'}
-	{#if engine}
-		<p class="text-muted-foreground text-xs" title={explainBackend(engine)}>
-			Transcribed on {backendLabel(engine)}
-		</p>
-	{/if}
-	{@render engineHint()}
-	<div class="space-y-1">
-		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
-		<p
-			bind:this={transcriptEl}
-			class="text-sm whitespace-pre-wrap {transcriptExpanded ? '' : 'line-clamp-4'}"
-		>
-			{transcript}
-		</p>
-		{#if transcriptOverflows || transcriptExpanded}
-			<Button
-				variant="link"
-				class="h-auto p-0 text-xs"
-				onclick={() => (transcriptExpanded = !transcriptExpanded)}
-			>
-				{transcriptExpanded ? 'Show less' : 'Show more'}
-			</Button>
-		{/if}
-	</div>
 	<ul class="max-h-64 space-y-2 overflow-y-auto">
 		{#each segments as segment, i (i)}
 			<li class="space-y-1">
