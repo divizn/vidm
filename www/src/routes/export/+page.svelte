@@ -18,7 +18,7 @@
 		<VideoPreview src={exportResult.url} downloadName={exportResult.downloadName} />
 	{:else}
 		<p class="text-muted-foreground text-sm">
-			Nothing to show — go back and export a video first.
+			Nothing to show. Go back and export a video first.
 		</p>
 	{/if}
 	<Button onclick={backToEditor} variant="outline">← Back to editor</Button>

@@ -304,7 +304,7 @@
 {#if status === 'idle'}
 	{#if clearedByTrimChange}
 		<p class="text-muted-foreground text-sm">
-			Trim changed since these captions were generated, so they no longer match — regenerate to
+			Trim changed since these captions were generated, so they no longer match. Regenerate to
 			pick up the new range.
 		</p>
 	{/if}
@@ -319,12 +319,12 @@
 {:else if status === 'transcribing'}
 	{#if downloadPercent > 0 && downloadPercent < 100}
 		<p class="text-muted-foreground text-sm">
-			Downloading speech model — one time, about 130&nbsp;MB ({downloadPercent}%)
+			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
 		</p>
 	{/if}
 	<p class="text-muted-foreground text-sm">
 		Transcribing{engine ? ` on ${backendLabel(engine)}` : ''}… {progress}%{etaSeconds !== null
-			? ` — about ${formatEta(etaSeconds)} remaining`
+			? `, about ${formatEta(etaSeconds)} remaining`
 			: ''}
 	</p>
 	{@render engineHint()}
@@ -336,7 +336,7 @@
 {#snippet engineHint()}
 	{#if engine && isFixableByUser(engine)}
 		<p class="text-muted-foreground text-sm">
-			Running on CPU because no GPU was available — turning on hardware acceleration in your
+			Running on CPU because no GPU was available. Turning on hardware acceleration in your
 			browser settings, then reloading, will make transcription substantially faster.
 		</p>
 	{/if}

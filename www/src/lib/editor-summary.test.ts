@@ -174,7 +174,7 @@ describe('buildMissingOptionsMessage', () => {
 	it('lists every tool label, lowercased, with an Oxford comma before "or"', () => {
 		const message = buildMissingOptionsMessage(buildToolStates(baseInput()));
 		expect(message).toBe(
-			'Select at least one option — trim, reformat, speed, volume, compression, or captions — to export.'
+			'Select at least one option to export: trim, reformat, speed, volume, compression, or captions.'
 		);
 	});
 
@@ -182,7 +182,7 @@ describe('buildMissingOptionsMessage', () => {
 		const message = buildMissingOptionsMessage([
 			{ id: 'trim', label: 'Trim', active: false, summaryText: undefined }
 		]);
-		expect(message).toBe('Select at least one option — trim — to export.');
+		expect(message).toBe('Select at least one option to export: trim.');
 	});
 
 	it('joins exactly two tool states with "or" and no comma', () => {
@@ -190,6 +190,6 @@ describe('buildMissingOptionsMessage', () => {
 			{ id: 'trim', label: 'Trim', active: false, summaryText: undefined },
 			{ id: 'speed', label: 'Speed', active: false, summaryText: undefined }
 		]);
-		expect(message).toBe('Select at least one option — trim or speed — to export.');
+		expect(message).toBe('Select at least one option to export: trim or speed.');
 	});
 });

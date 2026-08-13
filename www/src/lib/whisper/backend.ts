@@ -79,15 +79,15 @@ export function explainBackend(selection: BackendSelection): string {
 				? `GPU via WebGPU (${selection.adapterInfo})`
 				: 'GPU via WebGPU';
 		case 'gpu-disabled':
-			return 'CPU — GPU transcription is disabled pending a fix for corrupt output.';
+			return 'CPU. GPU transcription is disabled pending a fix for corrupt output.';
 		case 'no-webgpu-api':
-			return 'CPU — no WebGPU API in this browser. Needs a recent Chrome or Edge, served over HTTPS or localhost (plain http:// on a LAN address disables WebGPU).';
+			return 'CPU. No WebGPU API in this browser: needs a recent Chrome or Edge, served over HTTPS or localhost.';
 		case 'no-adapter':
-			return 'CPU — WebGPU exists but no GPU adapter was available. This almost always means hardware acceleration is turned off in the browser.';
+			return 'CPU. WebGPU exists but no GPU adapter was available, which almost always means hardware acceleration is turned off in the browser.';
 		case 'no-shader-f16':
-			return 'CPU — this GPU lacks shader-f16 (16-bit shader) support, which the GPU model requires.';
+			return 'CPU. This GPU lacks shader-f16 support, which the GPU model requires.';
 		case 'adapter-error':
-			return 'CPU — requesting a GPU adapter threw an error.';
+			return 'CPU. Requesting a GPU adapter threw an error.';
 	}
 }
 

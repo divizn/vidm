@@ -45,7 +45,7 @@
 	</div>
 	{#if volumePercent > 100}
 		<p class="text-muted-foreground text-sm">
-			The in-editor preview can't play louder than the original — boost above 100% is audible
+			The in-editor preview can't play louder than the original, so boost above 100% is audible
 			only in the exported file.
 		</p>
 	{/if}

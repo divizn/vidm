@@ -227,10 +227,10 @@
 <main class="flex flex-col gap-5 py-8">
 	<div class="flex items-start justify-between gap-4">
 		<div class="space-y-1">
-			<h1 class="text-2xl font-bold tracking-tight">vidm — lightweight video editor</h1>
+			<h1 class="text-2xl font-bold tracking-tight">vidm</h1>
 			<p class="text-muted-foreground text-sm">
-				Upload a video, then trim, reformat, adjust speed/volume, compress, and caption it. Runs
-				entirely in your browser.
+				Turn any clip into a short. Crop, trim, speed, compress and caption it, all in your
+				browser. Nothing is uploaded anywhere.
 			</p>
 		</div>
 		<div class="flex items-center gap-1">
@@ -320,7 +320,7 @@
 		<p class="text-muted-foreground text-sm">Loading FFmpeg engine…</p>
 	{:else if status === 'processing'}
 		<p class="text-muted-foreground text-sm">
-			Reformatting… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
+			Reformatting… {progress}%{etaSeconds !== null ? `, about ${formatEta(etaSeconds)} remaining` : ''}
 		</p>
 	{:else if status === 'error'}
 		<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>

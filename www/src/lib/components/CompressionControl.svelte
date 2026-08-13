@@ -76,7 +76,7 @@
 				bind:value={compression.targetMB}
 			/>
 			<span class="text-sm">MB</span>
-			<span class="text-muted-foreground text-sm">Approximate, not exact — single-pass encode.</span
+			<span class="text-muted-foreground text-sm">Approximate, not exact (single-pass encode).</span
 			>
 		</div>
 	{:else if compression.mode === 'custom'}
