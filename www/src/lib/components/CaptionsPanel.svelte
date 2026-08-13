@@ -1,5 +1,14 @@
 <script lang="ts">
-	import { pickBackend, transcribe, TRANSCRIBE_CHUNK_SECONDS, type TranscribeProgress } from '$lib/whisper';
+	import {
+		pickBackend,
+		transcribe,
+		backendLabel,
+		explainBackend,
+		isFixableByUser,
+		TRANSCRIBE_CHUNK_SECONDS,
+		type TranscribeProgress,
+		type BackendSelection
+	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
@@ -48,6 +57,9 @@
 	let downloadPercent = $state(0);
 	let startedAt = $state(0);
 	let errorMessage = $state('');
+	// Which engine this run picked, and why. Null until the first run resolves
+	// it — there is nothing honest to display before detection has happened.
+	let engine = $state<BackendSelection | null>(null);
 	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
 
 	// If trim changes after a transcript already exists, its timestamps no
@@ -211,7 +223,11 @@
 		generating = true;
 
 		try {
-			const backend = await pickBackend();
+			const selection = await pickBackend();
+			// Surfaced in the UI, not just the console: "why did this run on CPU"
+			// was unanswerable without devtools, and the most common cause
+			// (hardware acceleration switched off) is one the user can fix.
+			engine = selection;
 			const onProgress = (update: TranscribeProgress) => {
 				if (update.phase === 'downloading') {
 					downloadPercent = Math.round(update.percent);
@@ -224,7 +240,7 @@
 			};
 
 			segments =
-				backend === 'webgpu'
+				selection.backend === 'webgpu'
 					? await transcribe(
 							{ backend: 'webgpu', getAudio: extractAudioForTranscription },
 							onProgress,
@@ -238,6 +254,9 @@
 								startedAt = Date.now();
 								downloadPercent = 0;
 								progress = 0;
+								// The badge claimed GPU; the run is finishing on CPU. Say
+								// so rather than leaving a stale, now-wrong label up.
+								engine = { backend: 'wasm', reason: 'adapter-error' };
 								return extractAudioChunksForTranscription();
 							}
 						)
@@ -288,14 +307,32 @@
 		</p>
 	{/if}
 	<p class="text-muted-foreground text-sm">
-		Transcribing… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
+		Transcribing{engine ? ` on ${backendLabel(engine)}` : ''}… {progress}%{etaSeconds !== null
+			? ` — about ${formatEta(etaSeconds)} remaining`
+			: ''}
 	</p>
+	{@render engineHint()}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	<Button onclick={generate}>Retry</Button>
 {/if}
 
+{#snippet engineHint()}
+	{#if engine && isFixableByUser(engine)}
+		<p class="text-muted-foreground text-sm">
+			Running on CPU because no GPU was available — turning on hardware acceleration in your
+			browser settings, then reloading, will make transcription substantially faster.
+		</p>
+	{/if}
+{/snippet}
+
 {#if status === 'done'}
+	{#if engine}
+		<p class="text-muted-foreground text-xs" title={explainBackend(engine)}>
+			Transcribed on {backendLabel(engine)}
+		</p>
+	{/if}
+	{@render engineHint()}
 	<div class="space-y-1">
 		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
 		<p

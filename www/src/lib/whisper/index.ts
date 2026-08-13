@@ -1,9 +1,10 @@
-import { detectBackend, type TranscriptionBackend } from './backend';
+import { detectBackend, type BackendSelection, type TranscriptionBackend } from './backend';
 import { transcribeChunks, type AudioChunk } from './client';
 import { transcribeOnWebGpu, type TranscribeProgress } from './webgpu';
 import type { CaptionSegment } from './srt';
 
-export type { TranscribeProgress };
+export type { TranscribeProgress, BackendSelection };
+export { backendLabel, explainBackend, isFixableByUser } from './backend';
 export { TRANSCRIBE_CHUNK_SECONDS } from './client';
 
 // The caller extracts audio in whichever shape the chosen backend needs, so it
@@ -40,7 +41,10 @@ export async function transcribe(
 			const audio = await input.getAudio();
 			return await transcribeOnWebGpu(audio, onProgress);
 		} catch (err) {
-			console.error('[whisper] webgpu path failed, falling back to cpu:', err);
+			// Deliberately warn, not error: this is a degradation, not a failure —
+			// the user still gets captions. Logged loudly enough to explain why a
+			// run that announced "GPU" ended up taking CPU-path time.
+			console.warn('[vidm:whisper] GPU transcription failed, falling back to CPU:', err);
 			if (!onFallback) throw err;
 			const chunks = await onFallback();
 			return transcribeChunks(chunks, (percent) =>

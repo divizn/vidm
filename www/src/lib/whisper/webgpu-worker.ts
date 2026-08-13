@@ -39,6 +39,15 @@ let asr: AutomaticSpeechRecognitionPipeline | null = null;
 
 async function getPipeline(post: (m: WorkerResponse) => void) {
 	if (asr) return asr;
+
+	// transformers.js resolves 'webgpu' through deviceToExecutionProviders,
+	// which THROWS on an unsupported device rather than quietly downgrading to
+	// wasm. So reaching the line after this await is positive proof the WebGPU
+	// execution provider was actually accepted — not merely requested. Any
+	// failure propagates to the dispatcher, which logs the downgrade and runs
+	// the CPU path.
+	console.info('[vidm:whisper-gpu] loading whisper on WebGPU (fp16 encoder, q4f16 decoder)');
+	const startedAt = performance.now();
 	asr = await pipeline('automatic-speech-recognition', MODEL_ID, {
 		device: 'webgpu',
 		dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4f16' },
@@ -48,6 +57,9 @@ async function getPipeline(post: (m: WorkerResponse) => void) {
 			}
 		}
 	});
+	console.info(
+		`[vidm:whisper-gpu] WebGPU pipeline ready in ${((performance.now() - startedAt) / 1000).toFixed(1)}s`
+	);
 	return asr;
 }
 
@@ -96,6 +108,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 			}
 		);
 
+		const transcribeStartedAt = performance.now();
 		const output = (await transcriber(event.data.audio, {
 			return_timestamps: 'word',
 			chunk_length_s: CHUNK_LENGTH_S,
@@ -106,8 +119,18 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 			streamer
 		})) as { chunks?: WordChunk[] };
 
+		// Reported as a realtime factor so a GPU run can be compared against the
+		// CPU baseline directly, without anyone having to time it by hand.
+		const elapsedSeconds = (performance.now() - transcribeStartedAt) / 1000;
+		console.info(
+			`[vidm:whisper-gpu] transcribed ${durationSeconds.toFixed(1)}s of audio in ` +
+				`${elapsedSeconds.toFixed(1)}s (${(durationSeconds / elapsedSeconds).toFixed(1)}x realtime, ` +
+				`${totalWindows} window(s))`
+		);
+
 		post({ type: 'done', segments: groupWordsIntoSegments(output.chunks ?? []) });
 	} catch (err) {
+		console.error('[vidm:whisper-gpu] GPU transcription failed:', err);
 		post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
 	}
 };
