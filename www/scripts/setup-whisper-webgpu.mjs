@@ -12,9 +12,15 @@ import path from 'node:path';
 import https from 'node:https';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
+// The local directory name deliberately does not mirror MODEL_ID — the
+// upstream HF repo naming shouldn't leak into our tree. The `_timestamped`
+// suffix on MODEL_ID is required, not cosmetic: the plain
+// onnx-community/whisper-base.en export has no `cross_attentions.*` graph
+// outputs, so transformers.js cannot derive word-level timestamps from it at
+// all, and the karaoke burn-in would have nothing to highlight against.
 const MODEL_ID = 'onnx-community/whisper-base.en_timestamped';
 const MODEL_REVISION = 'main';
-const modelDir = path.join(root, '..', 'static', 'models', 'whisper-base.en_timestamped');
+const modelDir = path.join(root, '..', 'static', 'models', 'whisper-webgpu');
 const ortDir = path.join(root, '..', 'static', 'ort');
 
 // Only the two dtype variants actually loaded, not the whole onnx/ directory.
@@ -66,16 +72,16 @@ mkdirSync(path.join(modelDir, 'onnx'), { recursive: true });
 for (const file of MODEL_FILES) {
 	const dest = path.join(modelDir, file);
 	if (existsSync(dest)) {
-		console.log(`[setup-transformers-whisper] ${file} already present, skipping`);
+		console.log(`[setup-whisper-webgpu] ${file} already present, skipping`);
 		continue;
 	}
 	const url = `https://huggingface.co/${MODEL_ID}/resolve/${MODEL_REVISION}/${file}`;
-	console.log(`[setup-transformers-whisper] downloading ${file}...`);
+	console.log(`[setup-whisper-webgpu] downloading ${file}...`);
 	try {
 		await download(url, dest);
 	} catch (err) {
-		console.warn(`[setup-transformers-whisper] failed on ${file}: ${err.message}`);
-		console.warn('[setup-transformers-whisper] GPU transcription will fall back to CPU.');
+		console.warn(`[setup-whisper-webgpu] failed on ${file}: ${err.message}`);
+		console.warn('[setup-whisper-webgpu] GPU transcription will fall back to CPU.');
 		process.exit(0);
 	}
 }
@@ -95,12 +101,12 @@ const ortSrcDir = path.join(root, '..', 'node_modules', 'onnxruntime-web', 'dist
 if (!existsSync(ortSrcDir)) {
 	// Fail loudly: a missing runtime is not a degraded GPU path, it is a
 	// silent CDN dependency in production.
-	console.error(`[setup-transformers-whisper] onnxruntime-web not found at ${ortSrcDir}`);
-	console.error('[setup-transformers-whisper] is onnxruntime-web a direct dependency?');
+	console.error(`[setup-whisper-webgpu] onnxruntime-web not found at ${ortSrcDir}`);
+	console.error('[setup-whisper-webgpu] is onnxruntime-web a direct dependency?');
 	process.exit(1);
 }
 mkdirSync(ortDir, { recursive: true });
 for (const file of ['ort-wasm-simd-threaded.jsep.wasm', 'ort-wasm-simd-threaded.jsep.mjs']) {
 	copyFileSync(path.join(ortSrcDir, file), path.join(ortDir, file));
 }
-console.log('[setup-transformers-whisper] copied onnxruntime jsep runtime');
+console.log('[setup-whisper-webgpu] copied onnxruntime jsep runtime');
