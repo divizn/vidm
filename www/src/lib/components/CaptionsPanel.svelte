@@ -228,13 +228,21 @@
 			// was unanswerable without devtools, and the most common cause
 			// (hardware acceleration switched off) is one the user can fix.
 			engine = selection;
+			// Restart the ETA clock at the first real transcription tick. Elapsed
+			// time before that point is model download plus (on the GPU path)
+			// shader compilation — one-off costs that don't recur per percent, so
+			// extrapolating from them made early estimates absurd: a run showing
+			// 3% reported ~51 minutes remaining.
+			let timingTranscription = false;
 			const onProgress = (update: TranscribeProgress) => {
 				if (update.phase === 'downloading') {
 					downloadPercent = Math.round(update.percent);
 				} else {
-					// The model download precedes the first transcription only;
-					// clear it so the ETA reflects transcription alone.
 					downloadPercent = 100;
+					if (!timingTranscription) {
+						timingTranscription = true;
+						startedAt = Date.now();
+					}
 					progress = Math.round(update.percent);
 				}
 			};

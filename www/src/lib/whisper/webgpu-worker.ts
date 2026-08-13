@@ -6,6 +6,11 @@ import {
 } from '@huggingface/transformers';
 import { groupWordsIntoSegments, type WordChunk } from './segments';
 import { countWindows, WindowProgressTracker } from './chunk-progress';
+import { createEngineLog } from '$lib/log';
+
+// Decoded text is retained quietly rather than printed. See the streamer's
+// callback_function below for why this is not optional.
+const gpuLog = createEngineLog('whisper-gpu');
 
 // Everything is served from this origin — no CDN at runtime, which is what
 // makes offline use possible and keeps load timing controllable.
@@ -68,6 +73,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 	if (event.data.type !== 'transcribe') return;
 
 	try {
+		gpuLog.clear();
 		const transcriber = await getPipeline(post);
 		post({ type: 'progress', phase: 'transcribing', percent: 0 });
 
@@ -102,6 +108,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 			transcriber.tokenizer as ConstructorParameters<typeof WhisperTextStreamer>[0],
 			{
 				time_precision: timePrecision,
+				// MUST be supplied. TextStreamer defaults callback_function to
+				// `stdout_write`, which in a browser is `console.log` — so leaving
+				// it unset prints every decoded token to the console. That is not
+				// merely noisy: with devtools open, thousands of synchronous
+				// console writes dominate the run and made GPU transcription look
+				// slower than CPU. Route the text to the ring buffer instead.
+				callback_function: (text: string) => gpuLog.line(text),
 				on_chunk_start: (time) => {
 					post({ type: 'progress', phase: 'transcribing', percent: tracker.observe(time) * 100 });
 				}
@@ -131,6 +144,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 		post({ type: 'done', segments: groupWordsIntoSegments(output.chunks ?? []) });
 	} catch (err) {
 		console.error('[vidm:whisper-gpu] GPU transcription failed:', err);
+		gpuLog.dumpRecent('GPU transcription failure');
 		post({ type: 'error', message: err instanceof Error ? err.message : String(err) });
 	}
 };
