@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual escape hatch: the R2 upload gate below only fires on a change to
+  # specific tracked files, so a failed or missed upload (or a bucket wiped
+  # out of band) can't otherwise be re-run without an empty commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -61,7 +65,9 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -122,15 +128,39 @@ jobs:
       #
       # The previous version of this check diffed the asset files themselves —
       # but they're gitignored and untracked, so `git diff` was always quiet and
-      # this step never once fired. The tracked setup scripts are the real
-      # source of truth for which assets should exist, so diff those instead.
+      # this step never once fired. The tracked setup scripts (plus the
+      # lockfile, since a dependency bump can change what they download
+      # without editing the script itself) are the real source of truth for
+      # which assets should exist, so diff those instead.
+      #
+      # No `www/` prefix on these pathspecs: this is a `run:` step, and the
+      # job sets `defaults.run.working-directory: www`, so `git diff -- ...`
+      # already resolves pathspecs relative to `www/`. Adding `www/` here
+      # would look for `www/www/...`, match nothing, and silently make this
+      # step dead code again (exactly the bug being fixed right now).
+      # Contrast with the `actions/cache` step above: its `path:` and
+      # `hashFiles()` are action *inputs*, not shell pathspecs — those are
+      # always resolved relative to the repo root regardless of
+      # working-directory, which is why that step correctly keeps the
+      # `www/` prefix. That asymmetry between a `run:` step's shell cwd and
+      # a `uses:` action's own input resolution is exactly what makes this
+      # bug easy to reintroduce — check both conventions before editing
+      # either kind of step here.
+      #
+      # workflow_dispatch has no before/after commit range to diff, so
+      # treat a manual run as always wanting a re-upload — that's the whole
+      # point of the manual trigger: recovering from a failed or missed
+      # upload without an empty commit.
       - name: Check if large R2 assets changed
         id: r2-assets
         run: |
-          if git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- \
-            www/scripts/copy-ffmpeg-core.mjs \
-            www/scripts/setup-whisper.mjs \
-            www/scripts/setup-whisper-webgpu.mjs; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- \
+            scripts/copy-ffmpeg-core.mjs \
+            scripts/setup-whisper.mjs \
+            scripts/setup-whisper-webgpu.mjs \
+            pnpm-lock.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
@@ -147,6 +177,24 @@ jobs:
             echo "::error::ort jsep wasm exceeds the 25 MiB Workers static asset cap — move it to R2 (see worker.ts)"
             exit 1
           fi
+
+      # setup-whisper-webgpu.mjs deliberately soft-fails (exit 0, falls back
+      # to CPU transcription) when the HuggingFace download doesn't complete
+      # — that's the right behaviour for a local install without network
+      # access. But in CI it means static/models/.../*.onnx can simply be
+      # absent, and `r2 object put --file=` on a missing file below would
+      # fail with an opaque file-not-found/R2 error that doesn't point at
+      # the real cause. Check explicitly and name it. (Paths are relative to
+      # `www/`, same as every other `run:` step in this job — see the
+      # working-directory note on the r2-assets check above.)
+      - name: Assert whisper-webgpu ONNX models downloaded successfully
+        run: |
+          for f in static/models/whisper-webgpu/onnx/encoder_model_fp16.onnx static/models/whisper-webgpu/onnx/decoder_model_merged_q4f16.onnx; do
+            if [ ! -s "$f" ]; then
+              echo "::error::$f is missing or empty — setup-whisper-webgpu.mjs did not complete its model download during install (it soft-fails and falls back to CPU rather than break local installs without network access). Re-run with network access, or check the model-assets cache above."
+              exit 1
+            fi
+          done
 
       # ffmpeg-core.wasm, the whisper model, and the two WebGPU whisper ONNX
       # weights exceed Workers static assets' 25 MiB per-file limit —

@@ -19,7 +19,14 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 // outputs, so transformers.js cannot derive word-level timestamps from it at
 // all, and the karaoke burn-in would have nothing to highlight against.
 const MODEL_ID = 'onnx-community/whisper-base.en_timestamped';
-const MODEL_REVISION = 'main';
+// Pinned to a commit SHA, not 'main' — 'main' is a moving target, so an
+// upstream re-export would silently change the downloaded bytes with no
+// edit to this file, which is exactly the signal the CI upload gate (see
+// "Check if large R2 assets changed" in ci.yml) relies on to decide whether
+// to re-upload to R2. It also keeps the CI model-assets cache key meaningful
+// (see the `actions/cache` step in ci.yml, keyed by hashing this file).
+// Bumping the model means bumping this SHA, deliberately, in the same commit.
+const MODEL_REVISION = 'fa239a41836c3305f6beec180e5940f3823ff5b8';
 const modelDir = path.join(root, '..', 'static', 'models', 'whisper-webgpu');
 const ortDir = path.join(root, '..', 'static', 'ort');
 
