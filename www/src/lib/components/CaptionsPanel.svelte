@@ -1,5 +1,7 @@
 <script lang="ts">
-	import { transcribeChunks, TRANSCRIBE_CHUNK_SECONDS, type AudioChunk } from '$lib/whisper/client';
+	import { pickBackend, transcribe, TRANSCRIBE_CHUNK_SECONDS, type TranscribeProgress } from '$lib/whisper';
+	import type { AudioChunk } from '$lib/whisper/client';
+	import { wavToFloat32 } from '$lib/whisper/wav';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
@@ -40,6 +42,10 @@
 
 	let status = $state<Status>(segments.length ? 'done' : 'idle');
 	let progress = $state(0);
+	// 0 until the model download starts, 100 once weights are cached. Only the
+	// WebGPU path ever moves this — the CPU model is fetched by whisper.cpp
+	// itself with no progress signal.
+	let downloadPercent = $state(0);
 	let startedAt = $state(0);
 	let errorMessage = $state('');
 	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
@@ -160,9 +166,44 @@
 		return chunks;
 	}
 
+	// GPU path counterpart to extractAudioChunksForTranscription: same flags and
+	// the same re-encoding trim handling, but one continuous WAV instead of 30s
+	// segments, because transformers.js does its own overlapping-stride chunking
+	// and merges boundaries better than a hard cut can.
+	async function extractAudioForTranscription(): Promise<Float32Array> {
+		const ffmpeg = await loadFFmpeg();
+		const inputName = 'caption-audio-input.mp4';
+		const outputName = 'caption-audio.wav';
+		await ffmpeg.writeFile(inputName, await fetchFile(file));
+		await ffmpeg.exec([
+			...(trimActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : []),
+			'-i',
+			inputName,
+			'-vn',
+			'-ac',
+			'1',
+			'-ar',
+			'16000',
+			'-c:a',
+			'pcm_s16le',
+			outputName
+		]);
+
+		const data = (await ffmpeg.readFile(outputName)) as Uint8Array;
+		// Copy out before deleting, then free the virtual FS entries — this
+		// ffmpeg instance is shared with the export flow and outlives this call.
+		const samples = wavToFloat32(
+			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+		);
+		await ffmpeg.deleteFile(inputName);
+		await ffmpeg.deleteFile(outputName);
+		return samples;
+	}
+
 	async function generate() {
 		status = 'transcribing';
 		progress = 0;
+		downloadPercent = 0;
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
@@ -170,8 +211,29 @@
 		generating = true;
 
 		try {
-			const chunks = await extractAudioChunksForTranscription();
-			segments = await transcribeChunks(chunks, (p) => (progress = p));
+			const backend = await pickBackend();
+			const onProgress = (update: TranscribeProgress) => {
+				if (update.phase === 'downloading') {
+					downloadPercent = Math.round(update.percent);
+				} else {
+					// The model download precedes the first transcription only;
+					// clear it so the ETA reflects transcription alone.
+					downloadPercent = 100;
+					progress = Math.round(update.percent);
+				}
+			};
+
+			segments =
+				backend === 'webgpu'
+					? await transcribe(
+							{ backend: 'webgpu', audio: await extractAudioForTranscription() },
+							onProgress,
+							extractAudioChunksForTranscription
+						)
+					: await transcribe(
+							{ backend: 'wasm', chunks: await extractAudioChunksForTranscription() },
+							onProgress
+						);
 			status = 'done';
 		} catch (err) {
 			status = 'error';
@@ -209,6 +271,11 @@
 		</p>
 	{/if}
 {:else if status === 'transcribing'}
+	{#if downloadPercent > 0 && downloadPercent < 100}
+		<p class="text-muted-foreground text-sm">
+			Downloading speech model — one time, about 130&nbsp;MB ({downloadPercent}%)
+		</p>
+	{/if}
 	<p class="text-muted-foreground text-sm">
 		Transcribing… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
 	</p>
