@@ -54,6 +54,9 @@ importers:
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@7.2.2(@types/node@26.2.0)(jiti@2.7.0)(lightningcss@1.32.0))
+      onnxruntime-web:
+        specifier: 1.26.0-dev.20260416-b7804b056c
+        version: 1.26.0-dev.20260416-b7804b056c
       svelte:
         specifier: ^5.41.0
         version: 5.43.6
