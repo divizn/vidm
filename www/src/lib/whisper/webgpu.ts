@@ -4,6 +4,9 @@ import { FAST_MODEL_ID, QUALITY_MODEL_ID, type WorkerRequest, type WorkerRespons
 export type TranscribeProgress = {
 	phase: 'downloading' | 'transcribing';
 	percent: number;
+	// Present on the chunked CPU path, which is what the EMA estimator needs.
+	chunkIndex?: number;
+	chunkCount?: number;
 };
 
 // User-facing speed/accuracy choice. 'quality' is whisper-base (default);
