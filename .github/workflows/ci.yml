@@ -5,11 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
-  # Manual escape hatch for both gates below — the R2 upload and the deploy
-  # itself only fire when specific tracked files changed, so a failed or
-  # missed run (or a bucket wiped out of band) can't otherwise be redone
-  # without an empty commit. A manual run always deploys and always
-  # re-uploads.
+  # Manual escape hatch: the R2 upload gate below only fires on a change to
+  # specific tracked files, so a failed or missed upload (or a bucket wiped
+  # out of band) can't otherwise be re-run without an empty commit.
   workflow_dispatch:
 
 permissions:
@@ -62,68 +60,11 @@ jobs:
           path: www/build
           retention-days: 1
 
-  # Nothing under www/ means nothing to ship — the live site is built
-  # entirely from that directory, so a push touching only root files
-  # (README, Makefile, .gitignore) would otherwise rebuild and redeploy a
-  # byte-identical site.
-  #
-  # Deliberately NOT a workflow-level `paths:` filter. `test` is a required
-  # status check on main, and a workflow filtered out by paths never reports
-  # its checks at all — a root-only PR would sit unmergeable forever waiting
-  # on a check that can never run. Gating the deploy job is the only safe
-  # layer.
-  #
-  # Its own job rather than a step inside deploy so a skipped deploy costs
-  # nothing: no pnpm install, no artifact download, no wrangler.
-  changes:
-    # PRs never deploy (see deploy's own condition), so don't burn a runner
-    # working that out. Skipping this also skips deploy, which is correct.
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    outputs:
-      deployable: ${{ steps.filter.outputs.deployable }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      # This job sets no `defaults.run.working-directory`, so these pathspecs
-      # resolve from the repo root and DO take the `www/` prefix — the exact
-      # opposite of the R2 gate in deploy below, which runs under
-      # `working-directory: www` and must omit it. Getting this backwards is
-      # what made that other gate dead code twice; check which kind of step
-      # you are editing before changing either.
-      #
-      # `.github/workflows/ci.yml` counts as deployable: a change to the
-      # deploy logic itself should get exercised against production rather
-      # than sit unverified until the next unrelated www/ change.
-      #
-      # Any failure of the diff itself (a force-push whose `before` commit no
-      # longer exists, a missing range) exits non-zero and falls through to
-      # `true` — a needless deploy is cheap, a silently skipped one is not.
-      - name: Check for deployable changes
-        id: filter
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "deployable=true" >> "$GITHUB_OUTPUT"
-          elif [ -z "${{ github.event.before }}" ] || \
-               [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-            echo "deployable=true" >> "$GITHUB_OUTPUT"
-          elif git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- \
-            www/ \
-            .github/workflows/ci.yml; then
-            echo "deployable=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "deployable=true" >> "$GITHUB_OUTPUT"
-          fi
-
   deploy:
-    needs: [test, changes]
+    needs: test
     if: |
-      needs.changes.outputs.deployable == 'true' && (
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'push' && github.ref == 'refs/heads/main')
-      )
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     defaults:
       run:
