@@ -8,7 +8,7 @@
 	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
-	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
+	import { countdownSeconds, estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
@@ -60,7 +60,17 @@
 	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
 	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
 	let quality = $state<TranscriptionQuality>('quality');
-	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
+	let etaEstimate = $state<{ seconds: number; at: number } | null>(null);
+	let now = $state(Date.now());
+	const etaSeconds = $derived(
+		etaEstimate ? countdownSeconds(etaEstimate.seconds, etaEstimate.at, now) : null
+	);
+
+	$effect(() => {
+		if (status !== 'transcribing') return;
+		const id = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(id);
+	});
 
 	// If trim changes after a transcript already exists, its timestamps no
 	// longer correspond to the new range — clear it rather than leaving it
@@ -87,18 +97,6 @@
 			? URL.createObjectURL(new Blob([toSrt(segments)], { type: 'text/plain' }))
 			: null
 	);
-
-	const transcript = $derived(segments.map((seg) => seg.text.trim()).join(' '));
-	let transcriptExpanded = $state(false);
-	let transcriptEl = $state<HTMLParagraphElement | undefined>(undefined);
-	let transcriptOverflows = $state(false);
-	$effect(() => {
-		transcript;
-		transcriptExpanded;
-		if (transcriptEl) {
-			transcriptOverflows = transcriptEl.scrollHeight > transcriptEl.clientHeight;
-		}
-	});
 
 	function editSegmentText(index: number, text: string) {
 		// Editing invalidates that segment's word-level timing (it no longer
@@ -217,10 +215,10 @@
 		progress = 0;
 		downloadPercent = 0;
 		stage = 'preparing';
+		etaEstimate = null;
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
-		transcriptExpanded = false;
 		generating = true;
 
 		try {
@@ -242,6 +240,8 @@
 						startedAt = Date.now();
 					}
 					progress = Math.round(update.percent);
+					const remaining = estimateRemainingSeconds(startedAt, progress);
+					if (remaining !== null) etaEstimate = { seconds: remaining, at: Date.now() };
 				}
 			};
 
@@ -265,6 +265,7 @@
 								downloadPercent = 0;
 								progress = 0;
 								stage = 'preparing';
+								etaEstimate = null;
 								return extractAudioChunksForTranscription();
 							}
 						)
@@ -329,24 +330,6 @@
 {/if}
 
 {#if status === 'done'}
-	<div class="space-y-1">
-		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
-		<p
-			bind:this={transcriptEl}
-			class="text-sm whitespace-pre-wrap {transcriptExpanded ? '' : 'line-clamp-4'}"
-		>
-			{transcript}
-		</p>
-		{#if transcriptOverflows || transcriptExpanded}
-			<Button
-				variant="link"
-				class="h-auto p-0 text-xs"
-				onclick={() => (transcriptExpanded = !transcriptExpanded)}
-			>
-				{transcriptExpanded ? 'Show less' : 'Show more'}
-			</Button>
-		{/if}
-	</div>
 	<ul class="max-h-64 space-y-2 overflow-y-auto">
 		{#each segments as segment, i (i)}
 			<li class="space-y-1">
