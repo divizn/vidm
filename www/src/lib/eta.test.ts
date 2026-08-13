@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { countdownSeconds, emaNext, formatEta, remainingFromChunks } from './eta';
+import { blendEstimate, countdownSeconds, emaNext, formatEta, remainingFromChunks } from './eta';
 
 describe('emaNext', () => {
 	it('takes the first sample as-is', () => {
@@ -8,6 +8,14 @@ describe('emaNext', () => {
 
 	it('weights the latest sample by the smoothing factor', () => {
 		expect(emaNext(10, 20, 0.3)).toBeCloseTo(13, 10);
+	});
+
+	// The regression this guards: remaining time is rate x chunks-left, so with
+	// 30 chunks outstanding a reactive rate turns one slow chunk into a ~45s
+	// jump in the label. The default must stay well damped.
+	it('barely moves on a single slow chunk at the default smoothing', () => {
+		const rate = emaNext(8, 24);
+		expect((rate - 8) * 30).toBeLessThan(60);
 	});
 
 	// The reason for using an EMA at all: a cumulative mean stays anchored to
@@ -55,5 +63,21 @@ describe('formatEta', () => {
 
 	it('formats minutes and seconds', () => {
 		expect(formatEta(125)).toBe('2m 5s');
+	});
+});
+
+describe('blendEstimate', () => {
+	it('adopts the first estimate outright', () => {
+		expect(blendEstimate(null, 120)).toBe(120);
+	});
+
+	it('eases toward a revised estimate rather than snapping', () => {
+		expect(blendEstimate(100, 200, 0.25)).toBe(125);
+	});
+
+	it('converges on the new estimate over repeated updates', () => {
+		let shown = 100;
+		for (let i = 0; i < 12; i++) shown = blendEstimate(shown, 200, 0.25);
+		expect(shown).toBeGreaterThan(190);
 	});
 });
