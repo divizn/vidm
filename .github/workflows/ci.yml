@@ -166,17 +166,29 @@ jobs:
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # ort-wasm-simd-threaded.jsep.wasm is 24.9 MiB against Workers' 25 MiB
-      # per-file cap. An onnxruntime bump could silently push it over, so fail
-      # here with an actionable message instead of at upload time.
+      # onnxruntime ships several runtime builds (plain, .jsep, .jspi,
+      # .asyncify) and picks one at runtime from the browser's capabilities, so
+      # all of them are self-hosted — see setup-whisper-webgpu.mjs. The largest
+      # (.jsep) is 24.9 MiB against Workers' 25 MiB per-file cap, so an
+      # onnxruntime bump could silently push it over. Check every variant rather
+      # than one by name: the whole reason the GPU path broke in Firefox was
+      # hardcoding a single filename here and in the setup script.
       - name: Assert onnxruntime wasm still fits the static asset cap
         run: |
-          size=$(stat -c%s build/ort/ort-wasm-simd-threaded.jsep.wasm)
-          echo "ort jsep wasm: $size bytes"
-          if [ "$size" -ge 26214400 ]; then
-            echo "::error::ort jsep wasm exceeds the 25 MiB Workers static asset cap — move it to R2 (see worker.ts)"
-            exit 1
+          status=0
+          for f in build/ort/*.wasm; do
+            size=$(stat -c%s "$f")
+            echo "$(basename "$f"): $size bytes"
+            if [ "$size" -ge 26214400 ]; then
+              echo "::error::$(basename "$f") exceeds the 25 MiB Workers static asset cap — move it to R2 (see worker.ts)"
+              status=1
+            fi
+          done
+          if [ ! -e build/ort/ort-wasm-simd-threaded.asyncify.wasm ]; then
+            echo "::error::the onnxruntime asyncify build is missing — Firefox selects it and the GPU path will fail"
+            status=1
           fi
+          exit $status
 
       # setup-whisper-webgpu.mjs deliberately soft-fails (exit 0, falls back
       # to CPU transcription) when the HuggingFace download doesn't complete

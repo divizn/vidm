@@ -18,5 +18,9 @@
 /models/whisper-webgpu/onnx/decoder_model_merged_q4f16.onnx
   Cache-Control: public, max-age=31536000, immutable
 
-/ort/ort-wasm-simd-threaded.jsep.wasm
+# Every onnxruntime runtime variant, not just one: the browser picks between
+# the plain/.jsep/.jspi/.asyncify builds at runtime, so any of them may be the
+# one actually fetched. They are versioned by the pinned onnxruntime-web
+# dependency and never change in place.
+/ort/*
   Cache-Control: public, max-age=31536000, immutable
