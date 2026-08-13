@@ -117,6 +117,17 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 				callback_function: (text: string) => gpuLog.line(text),
 				on_chunk_start: (time) => {
 					post({ type: 'progress', phase: 'transcribing', percent: tracker.observe(time) * 100 });
+				},
+				// Fires once per window's generate(). The coarse but dependable
+				// signal: on_chunk_start only fires on segment boundaries, so a
+				// window holding one long unbroken utterance emits nothing and the
+				// bar looks frozen — which is exactly what a long clip did.
+				on_finalize: () => {
+					const percent = tracker.completeWindow() * 100;
+					console.info(
+						`[vidm:whisper-gpu] window complete — ${percent.toFixed(0)}% of ${totalWindows}-window clip`
+					);
+					post({ type: 'progress', phase: 'transcribing', percent });
 				}
 			}
 		);

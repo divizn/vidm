@@ -51,6 +51,25 @@ export class WindowProgressTracker {
 		private readonly durationSeconds: number
 	) {}
 
+	// Called when a window's generate() finishes (WhisperTextStreamer fires
+	// on_finalize once per window). This is the reliable coarse signal:
+	// timestamp tokens are emitted only at segment boundaries, so a window
+	// containing one long unbroken utterance reports nothing at all and the bar
+	// appears frozen. Completing a window always advances progress by one
+	// window's worth of audio, independent of what the model chose to emit.
+	completeWindow(): number {
+		if (this.windowIndex < this.totalWindows - 1) {
+			this.windowIndex++;
+			this.lastLocalTime = -Infinity;
+		}
+		if (this.durationSeconds > 0) {
+			const globalTime = this.windowIndex * this.jumpSeconds;
+			const fraction = Math.max(0, Math.min(1, globalTime / this.durationSeconds));
+			this.maxFraction = Math.max(this.maxFraction, fraction);
+		}
+		return this.maxFraction;
+	}
+
 	// Feed every local (window-relative) timestamp the streamer reports, in
 	// the order they're reported. Returns the current best-effort progress
 	// fraction in [0, 1], guaranteed non-decreasing across calls.

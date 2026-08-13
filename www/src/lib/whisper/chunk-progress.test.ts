@@ -62,3 +62,28 @@ describe('WindowProgressTracker', () => {
 		expect(tracker.observe(20)).toBeCloseTo(1);
 	});
 });
+
+describe('WindowProgressTracker.completeWindow', () => {
+	// The failure this exists to prevent: a window whose audio is one long
+	// unbroken utterance emits no timestamp tokens, so observe() is never
+	// called and the bar sits at 0 for the whole window.
+	it('advances progress even when no timestamps were observed', () => {
+		const tracker = new WindowProgressTracker(10, 20, 200);
+		expect(tracker.completeWindow()).toBeCloseTo(0.1, 5);
+		expect(tracker.completeWindow()).toBeCloseTo(0.2, 5);
+	});
+
+	it('never reports below what observe already reported', () => {
+		const tracker = new WindowProgressTracker(10, 20, 200);
+		const observed = tracker.observe(15);
+		expect(tracker.completeWindow()).toBeGreaterThanOrEqual(observed);
+	});
+
+	it('stays within [0,1] once every window is complete', () => {
+		const tracker = new WindowProgressTracker(3, 20, 60);
+		let last = 0;
+		for (let i = 0; i < 10; i++) last = tracker.completeWindow();
+		expect(last).toBeLessThanOrEqual(1);
+		expect(last).toBeGreaterThan(0);
+	});
+});
