@@ -4,7 +4,7 @@ import {
 	WhisperTextStreamer,
 	type AutomaticSpeechRecognitionPipeline
 } from '@huggingface/transformers';
-import { groupWordsIntoSegments, type WordChunk } from './segments';
+import { groupWordsIntoSegments, segmentsFromChunks, type WordChunk } from './segments';
 import { countWindows, WindowProgressTracker } from './chunk-progress';
 import { createEngineLog } from '$lib/log';
 
@@ -23,7 +23,10 @@ env.localModelPath = '/models/';
 // blanket `any` cast that would hide a real runtime-path misconfiguration.
 env.backends.onnx.wasm!.wasmPaths = '/ort/';
 
-const MODEL_ID = 'whisper-webgpu';
+// Local model ids, which are also the directory names under static/models/ —
+// they must match the `dir` values in scripts/setup-whisper-webgpu.mjs.
+export const QUALITY_MODEL_ID = 'whisper-webgpu';
+export const FAST_MODEL_ID = 'whisper-webgpu-fast';
 
 // Windowing knobs handed to the ASR pipeline below for its own long-audio
 // chunking — kept as named constants because chunk-progress.ts's window-count
@@ -34,7 +37,18 @@ const STRIDE_LENGTH_S = 5;
 // always produces for this path.
 const SAMPLE_RATE = 16000;
 
-export type WorkerRequest = { type: 'transcribe'; audio: Float32Array };
+export type WorkerRequest = {
+	type: 'transcribe';
+	audio: Float32Array;
+	modelId: string;
+	// Word-level timings drive the karaoke highlight. Requesting them costs the
+	// DTW pass over cross-attentions, so it's skipped when the caption style
+	// isn't highlighting words. Note the attention tensors themselves are
+	// computed either way: ONNX Runtime returns every declared graph output, and
+	// the `_timestamped` export declares them — only a different export would
+	// avoid that, at the cost of a second model per tier.
+	wordTimestamps: boolean;
+};
 export type WorkerResponse =
 	| { type: 'progress'; phase: 'downloading' | 'transcribing'; percent: number }
 	| { type: 'done'; segments: unknown }
@@ -42,7 +56,7 @@ export type WorkerResponse =
 
 let asr: AutomaticSpeechRecognitionPipeline | null = null;
 
-async function getPipeline(post: (m: WorkerResponse) => void) {
+async function getPipeline(modelId: string, post: (m: WorkerResponse) => void) {
 	if (asr) return asr;
 
 	// transformers.js resolves 'webgpu' through deviceToExecutionProviders,
@@ -51,9 +65,11 @@ async function getPipeline(post: (m: WorkerResponse) => void) {
 	// execution provider was actually accepted — not merely requested. Any
 	// failure propagates to the dispatcher, which logs the downgrade and runs
 	// the CPU path.
-	console.info('[vidm:whisper-gpu] loading whisper on WebGPU (fp16 encoder, q4f16 decoder)');
+	console.info(
+		`[vidm:whisper-gpu] loading ${modelId} on WebGPU (fp16 encoder, q4f16 decoder)`
+	);
 	const startedAt = performance.now();
-	asr = await pipeline('automatic-speech-recognition', MODEL_ID, {
+	asr = await pipeline('automatic-speech-recognition', modelId, {
 		device: 'webgpu',
 		dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4f16' },
 		progress_callback: (info: { status: string; progress?: number }) => {
@@ -74,7 +90,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
 	try {
 		gpuLog.clear();
-		const transcriber = await getPipeline(post);
+		const transcriber = await getPipeline(event.data.modelId, post);
 		post({ type: 'progress', phase: 'transcribing', percent: 0 });
 
 		// Real per-chunk progress instead of the single fire-once-at-0 event
@@ -134,7 +150,9 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 
 		const transcribeStartedAt = performance.now();
 		const output = (await transcriber(event.data.audio, {
-			return_timestamps: 'word',
+			// 'word' drives karaoke highlighting; plain `true` yields segment-level
+			// timings only and skips the DTW pass.
+			return_timestamps: event.data.wordTimestamps ? 'word' : true,
 			chunk_length_s: CHUNK_LENGTH_S,
 			// Overlapping stride is why this path handles chunk boundaries better
 			// than the CPU path's hard 30s cuts — words spanning a boundary get
@@ -152,7 +170,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 				`${totalWindows} window(s))`
 		);
 
-		post({ type: 'done', segments: groupWordsIntoSegments(output.chunks ?? []) });
+		const chunks = output.chunks ?? [];
+		post({
+			type: 'done',
+			segments: event.data.wordTimestamps
+				? groupWordsIntoSegments(chunks)
+				: segmentsFromChunks(chunks)
+		});
 	} catch (err) {
 		console.error('[vidm:whisper-gpu] GPU transcription failed:', err);
 		gpuLog.dumpRecent('GPU transcription failure');

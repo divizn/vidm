@@ -49,13 +49,21 @@ describe('transcribe', () => {
 		mocks.transcribeOnWebGpu.mockResolvedValue(segments);
 		const getAudio = vi.fn().mockResolvedValue(audio);
 		const onFallback = vi.fn();
-		const input: WebGpuInput = { backend: 'webgpu', getAudio };
+		const input: WebGpuInput = {
+			backend: 'webgpu',
+			getAudio,
+			options: { quality: 'quality', wordTimestamps: true }
+		};
 
 		const result = await transcribe(input, undefined, onFallback);
 
 		expect(result).toBe(segments);
 		expect(getAudio).toHaveBeenCalledTimes(1);
-		expect(mocks.transcribeOnWebGpu).toHaveBeenCalledWith(audio, undefined);
+		expect(mocks.transcribeOnWebGpu).toHaveBeenCalledWith(
+			audio,
+			{ quality: 'quality', wordTimestamps: true },
+			undefined
+		);
 		expect(onFallback).not.toHaveBeenCalled();
 		expect(mocks.transcribeChunks).not.toHaveBeenCalled();
 	});
@@ -66,7 +74,11 @@ describe('transcribe', () => {
 		const fallbackChunks = [chunk('fresh.wav')];
 		const onFallback = vi.fn().mockResolvedValue(fallbackChunks);
 		const getAudio = vi.fn().mockResolvedValue(new Float32Array([1]));
-		const input: WebGpuInput = { backend: 'webgpu', getAudio };
+		const input: WebGpuInput = {
+			backend: 'webgpu',
+			getAudio,
+			options: { quality: 'quality', wordTimestamps: true }
+		};
 
 		const result = await transcribe(input, undefined, onFallback);
 
@@ -81,7 +93,11 @@ describe('transcribe', () => {
 		const getAudio = vi.fn().mockRejectedValue(new Error('no audio track'));
 		const fallbackChunks = [chunk('fresh.wav')];
 		const onFallback = vi.fn().mockResolvedValue(fallbackChunks);
-		const input: WebGpuInput = { backend: 'webgpu', getAudio };
+		const input: WebGpuInput = {
+			backend: 'webgpu',
+			getAudio,
+			options: { quality: 'quality', wordTimestamps: true }
+		};
 
 		const result = await transcribe(input, undefined, onFallback);
 
@@ -95,7 +111,11 @@ describe('transcribe', () => {
 		const error = new Error('lost gpu device');
 		mocks.transcribeOnWebGpu.mockRejectedValue(error);
 		const getAudio = vi.fn().mockResolvedValue(new Float32Array([1]));
-		const input: WebGpuInput = { backend: 'webgpu', getAudio };
+		const input: WebGpuInput = {
+			backend: 'webgpu',
+			getAudio,
+			options: { quality: 'quality', wordTimestamps: true }
+		};
 
 		await expect(transcribe(input)).rejects.toThrow('lost gpu device');
 		expect(mocks.transcribeChunks).not.toHaveBeenCalled();
@@ -103,7 +123,11 @@ describe('transcribe', () => {
 
 	it('rethrows a GPU extraction failure when no fallback is provided', async () => {
 		const getAudio = vi.fn().mockRejectedValue(new Error('no audio track'));
-		const input: WebGpuInput = { backend: 'webgpu', getAudio };
+		const input: WebGpuInput = {
+			backend: 'webgpu',
+			getAudio,
+			options: { quality: 'quality', wordTimestamps: true }
+		};
 
 		await expect(transcribe(input)).rejects.toThrow('no audio track');
 		expect(mocks.transcribeOnWebGpu).not.toHaveBeenCalled();

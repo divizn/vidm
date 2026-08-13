@@ -28,6 +28,32 @@ function toSegment(words: CaptionWord[]): CaptionSegment {
 	};
 }
 
+// The segment-level counterpart, used when word timings weren't requested
+// (`return_timestamps: true` rather than 'word'). The pipeline's chunks are
+// already whole caption lines here, so they map across directly and carry no
+// `words` — the burn-in then renders plain text instead of karaoke, exactly as
+// it already does for a segment whose timings were dropped by a manual edit.
+//
+// Feeding these to groupWordsIntoSegments instead would be quietly wrong: each
+// chunk is a full sentence, so every sentence would be treated as one "word".
+export function segmentsFromChunks(chunks: WordChunk[]): CaptionSegment[] {
+	const segments: CaptionSegment[] = [];
+	let previousEnd = 0;
+	for (const chunk of chunks) {
+		const text = chunk.text.trim();
+		const [start, end] = chunk.timestamp ?? [];
+		if (!text || typeof start !== 'number' || !Number.isFinite(start)) continue;
+		const resolvedEnd = typeof end === 'number' && Number.isFinite(end) ? end : previousEnd || start;
+		previousEnd = resolvedEnd;
+		segments.push({
+			from: formatSrtTimestamp(start),
+			to: formatSrtTimestamp(resolvedEnd),
+			text
+		});
+	}
+	return segments;
+}
+
 export function groupWordsIntoSegments(chunks: WordChunk[]): CaptionSegment[] {
 	const segments: CaptionSegment[] = [];
 	let current: CaptionWord[] = [];

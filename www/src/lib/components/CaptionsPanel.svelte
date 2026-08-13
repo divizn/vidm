@@ -7,7 +7,8 @@
 		isFixableByUser,
 		TRANSCRIBE_CHUNK_SECONDS,
 		type TranscribeProgress,
-		type BackendSelection
+		type BackendSelection,
+		type TranscriptionQuality
 	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
@@ -60,6 +61,9 @@
 	// Which engine this run picked, and why. Null until the first run resolves
 	// it — there is nothing honest to display before detection has happened.
 	let engine = $state<BackendSelection | null>(null);
+	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
+	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
+	let quality = $state<TranscriptionQuality>('quality');
 	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
 
 	// If trim changes after a transcript already exists, its timestamps no
@@ -250,7 +254,11 @@
 			segments =
 				selection.backend === 'webgpu'
 					? await transcribe(
-							{ backend: 'webgpu', getAudio: extractAudioForTranscription },
+							{
+								backend: 'webgpu',
+								getAudio: extractAudioForTranscription,
+								options: { quality, wordTimestamps: style.wordHighlight }
+							},
 							onProgress,
 							async () => {
 								// Reached only once the GPU attempt (extraction or

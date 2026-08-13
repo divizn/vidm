@@ -1,10 +1,26 @@
 import type { CaptionSegment } from './srt';
-import type { WorkerRequest, WorkerResponse } from './webgpu-worker';
+import { FAST_MODEL_ID, QUALITY_MODEL_ID, type WorkerRequest, type WorkerResponse } from './webgpu-worker';
 
 export type TranscribeProgress = {
 	phase: 'downloading' | 'transcribing';
 	percent: number;
 };
+
+// User-facing speed/accuracy choice. 'quality' is whisper-base (default);
+// 'fast' is whisper-tiny, roughly 2-3x less compute and a smaller download.
+// Both are `_timestamped` exports, so word-level highlighting works in either.
+export type TranscriptionQuality = 'quality' | 'fast';
+
+export interface WebGpuOptions {
+	quality: TranscriptionQuality;
+	// Only needed when the caption style highlights words. Skipping it avoids
+	// the DTW pass over cross-attentions.
+	wordTimestamps: boolean;
+}
+
+export function modelIdFor(quality: TranscriptionQuality): string {
+	return quality === 'fast' ? FAST_MODEL_ID : QUALITY_MODEL_ID;
+}
 
 // One worker per call, terminated in a finally. The pipeline holds GPU buffers
 // and roughly 105 MiB of weights, so leaving it resident between runs would
@@ -19,6 +35,7 @@ export type TranscribeProgress = {
 // fresh Float32Array of samples instead.
 export function transcribeOnWebGpu(
 	audio: Float32Array,
+	options: WebGpuOptions,
 	onProgress?: (progress: TranscribeProgress) => void
 ): Promise<CaptionSegment[]> {
 	if (audio.byteLength === 0) {
@@ -55,7 +72,12 @@ export function transcribeOnWebGpu(
 			finish(() => reject(new Error(event.message || 'WebGPU transcription worker failed')));
 		};
 
-		const request: WorkerRequest = { type: 'transcribe', audio };
+		const request: WorkerRequest = {
+			type: 'transcribe',
+			audio,
+			modelId: modelIdFor(options.quality),
+			wordTimestamps: options.wordTimestamps
+		};
 		// Transfer rather than copy — a 20 minute clip is ~77MB of samples.
 		worker.postMessage(request, [audio.buffer]);
 	});

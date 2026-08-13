@@ -1,9 +1,14 @@
 import { detectBackend, type BackendSelection, type TranscriptionBackend } from './backend';
 import { transcribeChunks, type AudioChunk } from './client';
-import { transcribeOnWebGpu, type TranscribeProgress } from './webgpu';
+import {
+	transcribeOnWebGpu,
+	type TranscribeProgress,
+	type TranscriptionQuality,
+	type WebGpuOptions
+} from './webgpu';
 import type { CaptionSegment } from './srt';
 
-export type { TranscribeProgress, BackendSelection };
+export type { TranscribeProgress, BackendSelection, TranscriptionQuality };
 export { backendLabel, explainBackend, isFixableByUser } from './backend';
 export { TRANSCRIBE_CHUNK_SECONDS } from './client';
 
@@ -20,6 +25,7 @@ export interface WebGpuInput {
 	// crash that never reaches the fallback — evaluated eagerly as a plain
 	// argument, it would run before transcribe() is even entered.
 	getAudio: () => Promise<Float32Array>;
+	options: WebGpuOptions;
 }
 export interface WasmInput {
 	backend: 'wasm';
@@ -39,7 +45,7 @@ export async function transcribe(
 	if (input.backend === 'webgpu') {
 		try {
 			const audio = await input.getAudio();
-			return await transcribeOnWebGpu(audio, onProgress);
+			return await transcribeOnWebGpu(audio, input.options, onProgress);
 		} catch (err) {
 			// Deliberately warn, not error: this is a degradation, not a failure —
 			// the user still gets captions. Logged loudly enough to explain why a

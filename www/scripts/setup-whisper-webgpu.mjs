@@ -26,16 +26,33 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 // onnx-community/whisper-base.en export has no `cross_attentions.*` graph
 // outputs, so transformers.js cannot derive word-level timestamps from it at
 // all, and the karaoke burn-in would have nothing to highlight against.
-const MODEL_ID = 'onnx-community/whisper-base.en_timestamped';
-// Pinned to a commit SHA, not 'main' — 'main' is a moving target, so an
-// upstream re-export would silently change the downloaded bytes with no
+// Two quality tiers, both `_timestamped` so word-level highlighting works in
+// either. `base` is the default; `tiny` is roughly 2-3x less compute for users
+// who would rather have the transcript sooner than more accurate.
+//
+// Revisions are pinned to commit SHAs, not 'main' — 'main' is a moving target,
+// so an upstream re-export would silently change the downloaded bytes with no
 // edit to this file, which is exactly the signal the CI upload gate (see
-// "Check if large R2 assets changed" in ci.yml) relies on to decide whether
-// to re-upload to R2. It also keeps the CI model-assets cache key meaningful
-// (see the `actions/cache` step in ci.yml, keyed by hashing this file).
-// Bumping the model means bumping this SHA, deliberately, in the same commit.
-const MODEL_REVISION = 'fa239a41836c3305f6beec180e5940f3823ff5b8';
-const modelDir = path.join(root, '..', 'static', 'models', 'whisper-webgpu');
+// "Check if large R2 assets changed" in ci.yml) relies on to decide whether to
+// re-upload to R2. It also keeps the CI model-assets cache key meaningful (see
+// the `actions/cache` step in ci.yml, keyed by hashing this file). Bumping a
+// model means bumping its SHA, deliberately, in the same commit.
+const MODELS = [
+	{
+		id: 'onnx-community/whisper-base.en_timestamped',
+		revision: 'fa239a41836c3305f6beec180e5940f3823ff5b8',
+		// Local directory names deliberately do not mirror the upstream repo
+		// ids — HF naming shouldn't leak into our tree — but they ARE the model
+		// ids passed to transformers.js, so they must match webgpu-worker.ts.
+		dir: 'whisper-webgpu'
+	},
+	{
+		id: 'onnx-community/whisper-tiny.en_timestamped',
+		revision: 'aeaa13760958b03fac5062f457d317d3319c3168',
+		dir: 'whisper-webgpu-fast'
+	}
+];
+const modelsRoot = path.join(root, '..', 'static', 'models');
 const ortDir = path.join(root, '..', 'static', 'ort');
 
 // Only the two dtype variants actually loaded, not the whole onnx/ directory.
@@ -108,22 +125,25 @@ function download(url, dest) {
 	});
 }
 
-mkdirSync(path.join(modelDir, 'onnx'), { recursive: true });
+for (const model of MODELS) {
+	const modelDir = path.join(modelsRoot, model.dir);
+	mkdirSync(path.join(modelDir, 'onnx'), { recursive: true });
 
-for (const file of MODEL_FILES) {
-	const dest = path.join(modelDir, file);
-	if (existsSync(dest)) {
-		console.log(`[setup-whisper-webgpu] ${file} already present, skipping`);
-		continue;
-	}
-	const url = `https://huggingface.co/${MODEL_ID}/resolve/${MODEL_REVISION}/${file}`;
-	console.log(`[setup-whisper-webgpu] downloading ${file}...`);
-	try {
-		await download(url, dest);
-	} catch (err) {
-		console.warn(`[setup-whisper-webgpu] failed on ${file}: ${err.message}`);
-		console.warn('[setup-whisper-webgpu] GPU transcription will fall back to CPU.');
-		process.exit(0);
+	for (const file of MODEL_FILES) {
+		const dest = path.join(modelDir, file);
+		if (existsSync(dest)) {
+			console.log(`[setup-whisper-webgpu] ${model.dir}/${file} already present, skipping`);
+			continue;
+		}
+		const url = `https://huggingface.co/${model.id}/resolve/${model.revision}/${file}`;
+		console.log(`[setup-whisper-webgpu] downloading ${model.dir}/${file}...`);
+		try {
+			await download(url, dest);
+		} catch (err) {
+			console.warn(`[setup-whisper-webgpu] failed on ${model.dir}/${file}: ${err.message}`);
+			console.warn('[setup-whisper-webgpu] GPU transcription will fall back to CPU.');
+			process.exit(0);
+		}
 	}
 }
 

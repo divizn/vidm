@@ -28,6 +28,12 @@ export interface CaptionStyle {
 	textColor: string; // #rrggbb
 	highlightColor: string; // #rrggbb — active-word color, karaoke-style
 	fontSizePercent: number; // font size as a percentage of output height
+	// Karaoke-style per-word highlighting. Off renders each caption as plain
+	// text. It also decides whether transcription bothers requesting word-level
+	// timings at all — but it is applied at render time too, so toggling it
+	// after a transcript exists takes effect immediately instead of forcing a
+	// re-transcribe.
+	wordHighlight: boolean;
 }
 
 export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
@@ -35,7 +41,8 @@ export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
 	position: 'bottom',
 	textColor: '#FFFFFF',
 	highlightColor: '#FFE066',
-	fontSizePercent: 7
+	fontSizePercent: 7,
+	wordHighlight: true
 };
 
 export const MIN_FONT_SIZE_PERCENT = 3;
