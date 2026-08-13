@@ -1,14 +1,5 @@
-// Logging for the WASM/GPU engines (ffmpeg, whisper.cpp, transformers.js).
-//
-// These engines are chatty: ffmpeg emits a line per muxer/filter decision and
-// whisper.cpp prints its whole model/threading banner plus per-segment output.
-// Dumping all of that to the console drowns the few messages that matter — most
-// importantly which backend actually ran — which is what made a real GPU test
-// unreadable.
-//
-// So verbose engine output is off by default but retained in a small ring
-// buffer, and dumped only when something fails. Quiet when things work,
-// complete when they don't.
+// ffmpeg and whisper.cpp are chatty enough to drown the messages that matter,
+// so their output is retained in a ring buffer and printed only on failure.
 
 const VERBOSE_KEY = 'vidm:verbose';
 const RING_SIZE = 200;
@@ -41,15 +32,24 @@ export interface EngineLog {
 	dumpRecent(context: string): void;
 	/** Drop retained lines, so one run's output can't be blamed on the next. */
 	clear(): void;
+	// Needed in a Web Worker, where `location` is the worker script's own URL
+	// (no `?verbose`) and `localStorage` doesn't exist.
+	setVerbose(on: boolean): void;
 }
 
 export function createEngineLog(namespace: string): EngineLog {
 	const recent: string[] = [];
 	const tag = `[vidm:${namespace}]`;
+	let forced: boolean | null = null;
+
+	const isVerbose = () => forced ?? verboseEnabled();
 
 	return {
+		setVerbose(on: boolean) {
+			forced = on;
+		},
 		line(message: string) {
-			if (verboseEnabled()) {
+			if (isVerbose()) {
 				console.debug(tag, message);
 				return;
 			}

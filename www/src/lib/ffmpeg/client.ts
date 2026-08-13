@@ -2,8 +2,6 @@ import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { createEngineLog } from '$lib/log';
 
-// ffmpeg emits a line for essentially every decision it makes. Retained quietly
-// and dumped only on failure — see $lib/log.
 export const ffmpegLog = createEngineLog('ffmpeg');
 
 // Self-hosted, multi-threaded core — needs COOP/COEP (see vite.config.ts).

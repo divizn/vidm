@@ -22,14 +22,9 @@ const R2_ROUTES: Record<string, { key: string; contentType: string }> = {
 		key: 'ggml-tiny.en-q5_1.bin',
 		contentType: 'application/octet-stream'
 	},
-	'/models/whisper-webgpu/onnx/encoder_model_fp16.onnx': {
-		key: 'whisper-webgpu/encoder_model_fp16.onnx',
-		contentType: 'application/octet-stream'
-	},
-	'/models/whisper-webgpu/onnx/decoder_model_merged_q4f16.onnx': {
-		key: 'whisper-webgpu/decoder_model_merged_q4f16.onnx',
-		contentType: 'application/octet-stream'
-	}
+	// GPU (WebGPU) transcription is shelved — see GPU_TRANSCRIPTION_ENABLED in
+	// src/lib/whisper/backend.ts. Its ONNX weights have been deleted from the
+	// bucket, so no routes for them here; restore both together if it resumes.
 };
 
 async function serveFromR2(

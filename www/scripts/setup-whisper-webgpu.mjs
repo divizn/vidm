@@ -44,12 +44,29 @@ const MODELS = [
 		// Local directory names deliberately do not mirror the upstream repo
 		// ids — HF naming shouldn't leak into our tree — but they ARE the model
 		// ids passed to transformers.js, so they must match webgpu-worker.ts.
-		dir: 'whisper-webgpu'
+		dir: 'whisper-webgpu',
+		// int8, NOT q4f16. A 4-bit decoder produced badly degraded transcripts —
+		// words repeating ten or more times — identically in Chrome and Firefox,
+		// which is the classic symptom of an over-quantized Whisper decoder stuck
+		// in a repetition loop. Browser-independence is what ruled out WebGPU
+		// itself. The CPU path's whisper.cpp model uses the much gentler q5_1 and
+		// is unaffected.
+		//
+		// fp16 would be gentler still, but base's fp16 decoder is 104.7 MB and
+		// Cloudflare's single-part object upload tops out at 100 MB, so it cannot
+		// be published without multipart. int8 is the best available compromise
+		// and happens to be SMALLER than the q4f16 it replaces (51 MiB vs 65),
+		// because q4f16 stores fp16 scales alongside its 4-bit weights.
+		decoderDtype: 'int8'
 	},
 	{
 		id: 'onnx-community/whisper-tiny.en_timestamped',
 		revision: 'aeaa13760958b03fac5062f457d317d3319c3168',
-		dir: 'whisper-webgpu-fast'
+		dir: 'whisper-webgpu-fast',
+		// The fast tier keeps 4-bit weights deliberately: it trades accuracy for
+		// speed by definition, and is opt-in. If it shows the same repetition,
+		// raise it to int8 rather than shipping a tier that produces nonsense.
+		decoderDtype: 'q4f16'
 	}
 ];
 const modelsRoot = path.join(root, '..', 'static', 'models');
@@ -66,8 +83,7 @@ const MODEL_FILES = [
 	'merges.txt',
 	'added_tokens.json',
 	'special_tokens_map.json',
-	'onnx/encoder_model_fp16.onnx',
-	'onnx/decoder_model_merged_q4f16.onnx'
+	'onnx/encoder_model_fp16.onnx'
 ];
 
 function download(url, dest) {
@@ -129,7 +145,9 @@ for (const model of MODELS) {
 	const modelDir = path.join(modelsRoot, model.dir);
 	mkdirSync(path.join(modelDir, 'onnx'), { recursive: true });
 
-	for (const file of MODEL_FILES) {
+	// Each tier pulls only the decoder dtype it actually loads.
+	const files = [...MODEL_FILES, `onnx/decoder_model_merged_${model.decoderDtype}.onnx`];
+	for (const file of files) {
 		const dest = path.join(modelDir, file);
 		if (existsSync(dest)) {
 			console.log(`[setup-whisper-webgpu] ${model.dir}/${file} already present, skipping`);

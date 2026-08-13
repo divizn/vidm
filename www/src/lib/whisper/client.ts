@@ -2,8 +2,6 @@ import { FileTranscriber, type TranscribeToken } from '@transcribe/transcriber';
 import { parseSrtTimestamp, formatSrtTimestamp, type CaptionSegment, type CaptionWord } from './srt';
 import { createEngineLog } from '$lib/log';
 
-// whisper.cpp prints a full model/threading banner plus per-segment text on
-// every run. Retained quietly, dumped on failure — see $lib/log.
 const cpuLog = createEngineLog('whisper-cpu');
 
 // Self-hosted, same COOP/COEP setup as ffmpeg-core-mt (see vite.config.ts).
@@ -76,9 +74,7 @@ export async function transcribeChunks(
 	const transcriber = new FileTranscriber({
 		createModule,
 		model: MODEL_URL,
-		// Both streams go to the ring buffer, not straight to the console.
-		// whisper.cpp writes its ordinary model/threading banner to stderr, so
-		// routing stderr to console.error painted every healthy run as failing.
+		// stderr carries whisper.cpp's ordinary banner, so it is not an error stream.
 		print: (msg) => cpuLog.line(msg),
 		printErr: (msg) => cpuLog.line(msg),
 		onAbort: () => {
@@ -116,8 +112,6 @@ export async function transcribeChunks(
 			}
 		}
 	} catch (err) {
-		// The retained banner and per-segment lines are the only diagnostic
-		// material whisper.cpp gives us, so surface them exactly when they matter.
 		cpuLog.dumpRecent('transcription failure');
 		throw err;
 	} finally {

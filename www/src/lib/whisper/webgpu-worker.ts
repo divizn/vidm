@@ -28,6 +28,21 @@ env.backends.onnx.wasm!.wasmPaths = '/ort/';
 export const QUALITY_MODEL_ID = 'whisper-webgpu';
 export const FAST_MODEL_ID = 'whisper-webgpu-fast';
 
+// Decoder precision per tier, and it must match the file the setup script
+// downloaded for that tier (scripts/setup-whisper-webgpu.mjs `decoderDtype`).
+//
+// The quality tier is fp16, NOT 4-bit: a q4f16 decoder produced transcripts
+// with words repeating ten or more times, identically in Chrome and Firefox —
+// the classic signature of an over-quantized Whisper decoder stuck in a
+// repetition loop. Browser-independence is what ruled out WebGPU itself.
+// fp16 would be gentler still, but base's fp16 decoder is 104.7 MB and
+// Cloudflare's single-part upload limit is 100 MB. int8 is the best publishable
+// option and is actually smaller than the q4f16 it replaces.
+const DECODER_DTYPE: Record<string, 'fp16' | 'q4f16' | 'int8'> = {
+	[QUALITY_MODEL_ID]: 'int8',
+	[FAST_MODEL_ID]: 'q4f16'
+};
+
 // Windowing knobs handed to the ASR pipeline below for its own long-audio
 // chunking — kept as named constants because chunk-progress.ts's window-count
 // math has to replicate the exact same values to stay in sync with it.
@@ -65,13 +80,14 @@ async function getPipeline(modelId: string, post: (m: WorkerResponse) => void) {
 	// execution provider was actually accepted — not merely requested. Any
 	// failure propagates to the dispatcher, which logs the downgrade and runs
 	// the CPU path.
+	const decoderDtype = DECODER_DTYPE[modelId] ?? 'fp16';
 	console.info(
-		`[vidm:whisper-gpu] loading ${modelId} on WebGPU (fp16 encoder, q4f16 decoder)`
+		`[vidm:whisper-gpu] loading ${modelId} on WebGPU (fp16 encoder, ${decoderDtype} decoder)`
 	);
 	const startedAt = performance.now();
 	asr = await pipeline('automatic-speech-recognition', modelId, {
 		device: 'webgpu',
-		dtype: { encoder_model: 'fp16', decoder_model_merged: 'q4f16' },
+		dtype: { encoder_model: 'fp16', decoder_model_merged: decoderDtype },
 		progress_callback: (info: { status: string; progress?: number }) => {
 			if (info.status === 'progress_total' && typeof info.progress === 'number') {
 				post({ type: 'progress', phase: 'downloading', percent: info.progress });

@@ -1,27 +1,27 @@
 export type TranscriptionBackend = 'webgpu' | 'wasm';
 
-// Why a backend was chosen. Every wasm reason is a distinct, actionable cause —
-// collapsing them all into a bare 'wasm' made "it ran on CPU" impossible to
-// diagnose from a bug report, which is exactly what happened in GPU testing.
+// Shelved: every GPU config tried produced corrupt transcripts (words repeating
+// 10x+), identically in Chrome and Firefox with both q4f16 and int8 decoders,
+// and was slower than the CPU path. Untested suspects: fp16 encoder, and the
+// lightly-used `_timestamped` export. To resume, flip this, restore the
+// postinstall call to setup-whisper-webgpu.mjs, and the GPU steps in ci.yml.
+const GPU_TRANSCRIPTION_ENABLED = false;
+
+// Distinct reasons, so "it ran on CPU" is answerable from a bug report.
 export type BackendReason =
 	| 'webgpu-ok'
-	// navigator.gpu missing: browser too old, or not a secure context. WebGPU is
-	// unavailable over plain http:// on a non-localhost origin, so a LAN-hosted
-	// test silently becomes a CPU run.
+	| 'gpu-disabled'
+	// Also what you get over plain http:// on a LAN address — not a secure context.
 	| 'no-webgpu-api'
-	// The API exists but no adapter was handed out. In practice this is almost
-	// always browser hardware acceleration being switched off — the one cause a
-	// user can actually fix, so it earns its own reason and a UI hint.
+	// Almost always browser hardware acceleration being off: the one fixable case.
 	| 'no-adapter'
-	// Adapter exists but can't do fp16, which the q4f16 decoder requires.
 	| 'no-shader-f16'
 	| 'adapter-error';
 
 export interface BackendSelection {
 	backend: TranscriptionBackend;
 	reason: BackendReason;
-	// Populated on success. Tells an integrated GPU from a discrete one when the
-	// timings look wrong, which a bare "ran on GPU" cannot.
+	// Distinguishes an integrated GPU from a discrete one in a bug report.
 	adapterInfo?: string;
 }
 
@@ -35,12 +35,10 @@ export interface GpuLike {
 	requestAdapter(): Promise<AdapterLike | null>;
 }
 
-// The presence of `navigator.gpu` is not proof of a usable device — a machine
-// can expose the API and still fail to hand out an adapter (hardware
-// acceleration off, blocklisted driver, headless). Every failure degrades to
-// the whisper.cpp path rather than surfacing an error: captions still work,
-// just slower.
-export async function selectBackend(gpu: GpuLike | undefined): Promise<BackendSelection> {
+// `navigator.gpu` existing is not proof of a usable device, so every failure
+// here degrades to the CPU path rather than throwing. Kept separate from the
+// on/off flag so these checks stay under test while the feature is shelved.
+export async function probeGpu(gpu: GpuLike | undefined): Promise<BackendSelection> {
 	if (!gpu) return { backend: 'wasm', reason: 'no-webgpu-api' };
 	try {
 		const adapter = await gpu.requestAdapter();
@@ -62,7 +60,11 @@ export async function selectBackend(gpu: GpuLike | undefined): Promise<BackendSe
 	}
 }
 
-// Short label for the UI badge — what actually ran.
+export async function selectBackend(gpu: GpuLike | undefined): Promise<BackendSelection> {
+	if (!GPU_TRANSCRIPTION_ENABLED) return { backend: 'wasm', reason: 'gpu-disabled' };
+	return probeGpu(gpu);
+}
+
 export function backendLabel(selection: BackendSelection): string {
 	if (selection.backend === 'webgpu') {
 		return selection.adapterInfo ? `GPU · ${selection.adapterInfo}` : 'GPU';
@@ -70,14 +72,14 @@ export function backendLabel(selection: BackendSelection): string {
 	return 'CPU';
 }
 
-// Full explanation, written for someone who has not read this file. Used both
-// in the console and, for the fixable case, in the UI.
 export function explainBackend(selection: BackendSelection): string {
 	switch (selection.reason) {
 		case 'webgpu-ok':
 			return selection.adapterInfo
 				? `GPU via WebGPU (${selection.adapterInfo})`
 				: 'GPU via WebGPU';
+		case 'gpu-disabled':
+			return 'CPU — GPU transcription is disabled pending a fix for corrupt output.';
 		case 'no-webgpu-api':
 			return 'CPU — no WebGPU API in this browser. Needs a recent Chrome or Edge, served over HTTPS or localhost (plain http:// on a LAN address disables WebGPU).';
 		case 'no-adapter':
@@ -89,8 +91,7 @@ export function explainBackend(selection: BackendSelection): string {
 	}
 }
 
-// True only for the cause the user can actually do something about, so the UI
-// can show an actionable hint instead of nagging on every CPU-only machine.
+// Only the cause a user can act on, so CPU-only machines aren't nagged.
 export function isFixableByUser(selection: BackendSelection): boolean {
 	return selection.reason === 'no-adapter';
 }

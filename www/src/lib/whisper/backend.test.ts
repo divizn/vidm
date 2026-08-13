@@ -1,14 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { backendLabel, explainBackend, isFixableByUser, selectBackend } from './backend';
+import { backendLabel, explainBackend, isFixableByUser, probeGpu, selectBackend } from './backend';
 
 const adapter = (features: string[], info?: Record<string, string>) => ({
 	features: new Set(features),
 	...(info ? { info } : {})
 });
 
-describe('selectBackend', () => {
+// probeGpu is the capability check itself. selectBackend wraps it with the
+// shelved-feature flag, which is asserted separately below.
+describe('probeGpu', () => {
 	it('reports no-webgpu-api when the WebGPU API is absent', async () => {
-		expect(await selectBackend(undefined)).toEqual({
+		expect(await probeGpu(undefined)).toEqual({
 			backend: 'wasm',
 			reason: 'no-webgpu-api'
 		});
@@ -16,7 +18,7 @@ describe('selectBackend', () => {
 
 	it('selects webgpu when an adapter supports shader-f16', async () => {
 		const gpu = { requestAdapter: async () => adapter(['shader-f16']) };
-		expect(await selectBackend(gpu)).toEqual({ backend: 'webgpu', reason: 'webgpu-ok' });
+		expect(await probeGpu(gpu)).toEqual({ backend: 'webgpu', reason: 'webgpu-ok' });
 	});
 
 	it('includes adapter info when the driver exposes it', async () => {
@@ -24,7 +26,7 @@ describe('selectBackend', () => {
 			requestAdapter: async () =>
 				adapter(['shader-f16'], { vendor: 'nvidia', architecture: 'ampere' })
 		};
-		const result = await selectBackend(gpu);
+		const result = await probeGpu(gpu);
 		expect(result.backend).toBe('webgpu');
 		expect(result.adapterInfo).toBe('nvidia ampere');
 	});
@@ -32,12 +34,12 @@ describe('selectBackend', () => {
 	// The signature of hardware acceleration being switched off in the browser.
 	it('reports no-adapter when the API exists but hands out no adapter', async () => {
 		const gpu = { requestAdapter: async () => null };
-		expect(await selectBackend(gpu)).toEqual({ backend: 'wasm', reason: 'no-adapter' });
+		expect(await probeGpu(gpu)).toEqual({ backend: 'wasm', reason: 'no-adapter' });
 	});
 
 	it('reports no-shader-f16 when the adapter cannot do fp16', async () => {
 		const gpu = { requestAdapter: async () => adapter([]) };
-		expect(await selectBackend(gpu)).toEqual({ backend: 'wasm', reason: 'no-shader-f16' });
+		expect(await probeGpu(gpu)).toEqual({ backend: 'wasm', reason: 'no-shader-f16' });
 	});
 
 	it('reports adapter-error when requesting an adapter throws', async () => {
@@ -46,7 +48,7 @@ describe('selectBackend', () => {
 				throw new Error('no gpu process');
 			}
 		};
-		expect(await selectBackend(gpu)).toEqual({ backend: 'wasm', reason: 'adapter-error' });
+		expect(await probeGpu(gpu)).toEqual({ backend: 'wasm', reason: 'adapter-error' });
 	});
 });
 
@@ -97,5 +99,21 @@ describe('isFixableByUser', () => {
 		for (const reason of ['webgpu-ok', 'no-webgpu-api', 'no-shader-f16', 'adapter-error'] as const) {
 			expect(isFixableByUser({ backend: 'wasm', reason })).toBe(false);
 		}
+	});
+});
+
+describe('selectBackend', () => {
+	// GPU transcription is shelved (GPU_TRANSCRIPTION_ENABLED = false) because
+	// every configuration tried produced corrupt transcripts. Until that is
+	// solved, selection must never reach the probe, whatever the hardware says.
+	it('reports gpu-disabled regardless of a capable adapter', async () => {
+		const gpu = {
+			requestAdapter: async () => ({ features: new Set(['shader-f16']) })
+		};
+		expect(await selectBackend(gpu)).toEqual({ backend: 'wasm', reason: 'gpu-disabled' });
+	});
+
+	it('does not tell the user to change a browser setting for a disabled feature', () => {
+		expect(isFixableByUser({ backend: 'wasm', reason: 'gpu-disabled' })).toBe(false);
 	});
 });
