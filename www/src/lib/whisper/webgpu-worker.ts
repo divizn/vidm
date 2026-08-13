@@ -35,9 +35,9 @@ export const FAST_MODEL_ID = 'whisper-webgpu-fast';
 // with words repeating ten or more times, identically in Chrome and Firefox —
 // the classic signature of an over-quantized Whisper decoder stuck in a
 // repetition loop. Browser-independence is what ruled out WebGPU itself.
-// fp16 would be gentler still, but base's fp16 decoder is 104.7 MB and
-// Cloudflare's single-part upload limit is 100 MB. int8 is the best publishable
-// option and is actually smaller than the q4f16 it replaces.
+// int8 was chosen over fp16 on a mistaken belief that a 100 MB upload limit
+// blocked fp16. It does not: the upload had in fact succeeded. int8 then turned
+// out far slower on WebGPU, so fp16 is the first thing to try if this resumes.
 const DECODER_DTYPE: Record<string, 'fp16' | 'q4f16' | 'int8'> = {
 	[QUALITY_MODEL_ID]: 'int8',
 	[FAST_MODEL_ID]: 'q4f16'

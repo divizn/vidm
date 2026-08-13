@@ -2,8 +2,9 @@ export type TranscriptionBackend = 'webgpu' | 'wasm';
 
 // Shelved: every GPU config tried produced corrupt transcripts (words repeating
 // 10x+), identically in Chrome and Firefox with both q4f16 and int8 decoders,
-// and was slower than the CPU path. Untested suspects: fp16 encoder, and the
-// lightly-used `_timestamped` export. To resume, flip this, restore the
+// and was slower than the CPU path. Never tried: an unquantized fp16 decoder
+// (wrongly ruled out over a non-existent upload limit) or fp32 encoder, and the
+// `_timestamped` export is lightly used. To resume, flip this, restore the
 // postinstall call to setup-whisper-webgpu.mjs, and the GPU steps in ci.yml.
 const GPU_TRANSCRIPTION_ENABLED = false;
 

@@ -52,11 +52,10 @@ const MODELS = [
 		// itself. The CPU path's whisper.cpp model uses the much gentler q5_1 and
 		// is unaffected.
 		//
-		// fp16 would be gentler still, but base's fp16 decoder is 104.7 MB and
-		// Cloudflare's single-part object upload tops out at 100 MB, so it cannot
-		// be published without multipart. int8 is the best available compromise
-		// and happens to be SMALLER than the q4f16 it replaces (51 MiB vs 65),
-		// because q4f16 stores fp16 scales alongside its 4-bit weights.
+		// int8 was chosen over fp16 on a mistaken belief that Cloudflare's upload
+		// limit blocked fp16 (wrangler reported "fetch failed" while the object
+		// had actually uploaded in full). fp16 is publishable, and int8 proved far
+		// slower on WebGPU, so try fp16 first if this resumes.
 		decoderDtype: 'int8'
 	},
 	{
