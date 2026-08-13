@@ -5,6 +5,7 @@ export type TranscribeProgress = {
 	phase: 'downloading' | 'transcribing';
 	percent: number;
 	// Present on the chunked CPU path, which is what the EMA estimator needs.
+	fraction?: number;
 	chunkIndex?: number;
 	chunkCount?: number;
 };

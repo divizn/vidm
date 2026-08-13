@@ -9,8 +9,23 @@ export function estimateRemainingSeconds(startedAt: number, progressPercent: num
 // Exponential moving average of seconds-per-chunk. A cumulative mean weights a
 // slow first chunk equally with everything after it and adapts to a real change
 // in throughput (throttling, a busy machine) only very slowly.
-export function emaNext(previous: number | null, sample: number, smoothing = 0.3): number {
+// Smoothing is deliberately low. Remaining time is seconds-per-chunk times
+// chunks-remaining, so with 30 chunks left a 1.5s swing in the rate moves the
+// label by 45s. Chunk durations vary a lot (silence is fast, dense speech is
+// slow), so a reactive factor chases that noise and amplifies it.
+export function emaNext(previous: number | null, sample: number, smoothing = 0.1): number {
 	return previous === null ? sample : smoothing * sample + (1 - smoothing) * previous;
+}
+
+// Eases the displayed estimate toward a new one instead of snapping to it, so a
+// revised rate converges over a few updates rather than jumping.
+export function blendEstimate(
+	previousRemaining: number | null,
+	computed: number,
+	weight = 0.25
+): number {
+	if (previousRemaining === null) return computed;
+	return weight * computed + (1 - weight) * previousRemaining;
 }
 
 // Chunks are uniform, so remaining work is measured in chunks rather than

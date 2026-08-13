@@ -63,6 +63,9 @@ function wordsFromTokens(tokens: TranscribeToken[]): CaptionWord[] {
 // shifted back onto the original, unchunked timeline.
 export interface ChunkProgress {
 	percent: number;
+	// Unrounded 0-1 progress. `percent` is rounded for display, and deriving the
+	// time estimate from it quantises remaining work into visible jumps.
+	fraction: number;
 	chunkIndex: number;
 	chunkCount: number;
 }
@@ -100,8 +103,10 @@ export async function transcribeChunks(
 		for (let i = 0; i < chunks.length; i++) {
 			const { file, offsetSeconds } = chunks[i];
 			transcriber.onProgress = (chunkPercent: number) => {
+				const fraction = (i + chunkPercent / 100) / chunks.length;
 				onProgress?.({
-					percent: Math.round(((i + chunkPercent / 100) / chunks.length) * 100),
+					percent: Math.round(fraction * 100),
+					fraction,
 					chunkIndex: i,
 					chunkCount: chunks.length
 				});

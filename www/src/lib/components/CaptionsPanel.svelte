@@ -9,6 +9,7 @@
 	import type { AudioChunk } from '$lib/whisper/client';
 	import { wavToFloat32 } from '$lib/whisper/wav';
 	import {
+		blendEstimate,
 		countdownSeconds,
 		emaNext,
 		estimateRemainingSeconds,
@@ -263,11 +264,15 @@
 							lastChunkBoundaryAt = at;
 						}
 						if (secondsPerChunk !== null) {
-							const chunksDone = (update.percent / 100) * update.chunkCount;
-							etaEstimate = {
-								seconds: remainingFromChunks(secondsPerChunk, update.chunkCount - chunksDone),
-								at
-							};
+							const chunksDone = (update.fraction ?? update.percent / 100) * update.chunkCount;
+							const computed = remainingFromChunks(
+								secondsPerChunk,
+								update.chunkCount - chunksDone
+							);
+							const showing = etaEstimate
+								? countdownSeconds(etaEstimate.seconds, etaEstimate.at, at)
+								: null;
+							etaEstimate = { seconds: blendEstimate(showing, computed), at };
 							return;
 						}
 					}
