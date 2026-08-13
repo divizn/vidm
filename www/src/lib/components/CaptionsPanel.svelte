@@ -2,12 +2,8 @@
 	import {
 		pickBackend,
 		transcribe,
-		backendLabel,
-		explainBackend,
-		isFixableByUser,
 		TRANSCRIBE_CHUNK_SECONDS,
 		type TranscribeProgress,
-		type BackendSelection,
 		type TranscriptionQuality
 	} from '$lib/whisper';
 	import type { AudioChunk } from '$lib/whisper/client';
@@ -57,10 +53,10 @@
 	// itself with no progress signal.
 	let downloadPercent = $state(0);
 	let startedAt = $state(0);
+	// Setup (ffmpeg load, audio extraction, whisper model load) dominates a short
+	// clip and reports no percentage, so name the phase instead of sitting at 0%.
+	let stage = $state<'preparing' | 'transcribing'>('preparing');
 	let errorMessage = $state('');
-	// Which engine this run picked, and why. Null until the first run resolves
-	// it — there is nothing honest to display before detection has happened.
-	let engine = $state<BackendSelection | null>(null);
 	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
 	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
 	let quality = $state<TranscriptionQuality>('quality');
@@ -220,6 +216,7 @@
 		status = 'transcribing';
 		progress = 0;
 		downloadPercent = 0;
+		stage = 'preparing';
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
@@ -228,10 +225,6 @@
 
 		try {
 			const selection = await pickBackend();
-			// Surfaced in the UI, not just the console: "why did this run on CPU"
-			// was unanswerable without devtools, and the most common cause
-			// (hardware acceleration switched off) is one the user can fix.
-			engine = selection;
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
 			// shader compilation — one-off costs that don't recur per percent, so
@@ -245,6 +238,7 @@
 					downloadPercent = 100;
 					if (!timingTranscription) {
 						timingTranscription = true;
+						stage = 'transcribing';
 						startedAt = Date.now();
 					}
 					progress = Math.round(update.percent);
@@ -270,9 +264,7 @@
 								startedAt = Date.now();
 								downloadPercent = 0;
 								progress = 0;
-								// The badge claimed GPU; the run is finishing on CPU. Say
-								// so rather than leaving a stale, now-wrong label up.
-								engine = { backend: 'wasm', reason: 'adapter-error' };
+								stage = 'preparing';
 								return extractAudioChunksForTranscription();
 							}
 						)
@@ -322,33 +314,21 @@
 			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
 		</p>
 	{/if}
-	<p class="text-muted-foreground text-sm">
-		Transcribing{engine ? ` on ${backendLabel(engine)}` : ''}… {progress}%{etaSeconds !== null
-			? `, about ${formatEta(etaSeconds)} remaining`
-			: ''}
-	</p>
-	{@render engineHint()}
+	{#if stage === 'preparing'}
+		<p class="text-muted-foreground text-sm">Preparing audio…</p>
+	{:else}
+		<p class="text-muted-foreground text-sm">
+			Transcribing…{progress > 0 ? ` ${progress}%` : ''}{etaSeconds !== null
+				? `, about ${formatEta(etaSeconds)} remaining`
+				: ''}
+		</p>
+	{/if}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	<Button onclick={generate}>Retry</Button>
 {/if}
 
-{#snippet engineHint()}
-	{#if engine && isFixableByUser(engine)}
-		<p class="text-muted-foreground text-sm">
-			Running on CPU because no GPU was available. Turning on hardware acceleration in your
-			browser settings, then reloading, will make transcription substantially faster.
-		</p>
-	{/if}
-{/snippet}
-
 {#if status === 'done'}
-	{#if engine}
-		<p class="text-muted-foreground text-xs" title={explainBackend(engine)}>
-			Transcribed on {backendLabel(engine)}
-		</p>
-	{/if}
-	{@render engineHint()}
 	<div class="space-y-1">
 		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
 		<p
