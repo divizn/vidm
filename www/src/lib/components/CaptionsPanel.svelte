@@ -226,9 +226,20 @@
 			segments =
 				backend === 'webgpu'
 					? await transcribe(
-							{ backend: 'webgpu', audio: await extractAudioForTranscription() },
+							{ backend: 'webgpu', getAudio: extractAudioForTranscription },
 							onProgress,
-							extractAudioChunksForTranscription
+							async () => {
+								// Reached only once the GPU attempt (extraction or
+								// transcription) has actually failed — restart the ETA
+								// clock and clear the download banner so the fallback's
+								// timing/UI isn't polluted by the failed attempt, then
+								// extract fresh audio for the CPU path (never reuse
+								// anything left over from the GPU attempt).
+								startedAt = Date.now();
+								downloadPercent = 0;
+								progress = 0;
+								return extractAudioChunksForTranscription();
+							}
 						)
 					: await transcribe(
 							{ backend: 'wasm', chunks: await extractAudioChunksForTranscription() },

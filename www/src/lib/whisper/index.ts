@@ -13,7 +13,12 @@ export const pickBackend = detectBackend;
 
 export interface WebGpuInput {
 	backend: 'webgpu';
-	audio: Float32Array;
+	// A thunk, not a resolved Float32Array: extraction has to run *inside*
+	// this function's try/catch below, or a failure there (e.g. no audio
+	// track, or a wavToFloat32 rejection) would be an argument-evaluation
+	// crash that never reaches the fallback — evaluated eagerly as a plain
+	// argument, it would run before transcribe() is even entered.
+	getAudio: () => Promise<Float32Array>;
 }
 export interface WasmInput {
 	backend: 'wasm';
@@ -22,8 +27,9 @@ export interface WasmInput {
 export type TranscribeInput = WebGpuInput | WasmInput;
 
 // Falls back to whisper.cpp if the GPU run fails for any reason (lost adapter,
-// out of memory, model fetch failure). Captions matter more than which engine
-// produced them, so a GPU failure costs speed, never the feature.
+// out of memory, model fetch failure, or a failure extracting audio for it).
+// Captions matter more than which engine produced them, so a GPU failure
+// costs speed, never the feature.
 export async function transcribe(
 	input: TranscribeInput,
 	onProgress?: (progress: TranscribeProgress) => void,
@@ -31,7 +37,8 @@ export async function transcribe(
 ): Promise<CaptionSegment[]> {
 	if (input.backend === 'webgpu') {
 		try {
-			return await transcribeOnWebGpu(input.audio, onProgress);
+			const audio = await input.getAudio();
+			return await transcribeOnWebGpu(audio, onProgress);
 		} catch (err) {
 			console.error('[whisper] webgpu path failed, falling back to cpu:', err);
 			if (!onFallback) throw err;
