@@ -6,7 +6,15 @@
 // onnx-community/whisper-base.en decoder has no `cross_attentions.*` graph
 // outputs, so transformers.js cannot derive word-level timestamps from it and
 // the karaoke burn-in would have nothing to highlight against.
-import { existsSync, mkdirSync, copyFileSync, createWriteStream, renameSync, unlinkSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	copyFileSync,
+	createWriteStream,
+	readdirSync,
+	renameSync,
+	unlinkSync
+} from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import https from 'node:https';
@@ -119,17 +127,15 @@ for (const file of MODEL_FILES) {
 	}
 }
 
-// onnxruntime-web ships the WebGPU (JSEP) build; transformers.js is pointed at
-// this directory via env.backends.onnx.wasm.wasmPaths so it never reaches for
-// a CDN at runtime.
+// transformers.js is pointed at this directory via
+// env.backends.onnx.wasm.wasmPaths so onnxruntime never reaches for a CDN at
+// runtime.
 //
 // onnxruntime-web is declared as a direct dependency purely so pnpm hoists it
 // to node_modules/onnxruntime-web. As a transitive dependency of
 // @huggingface/transformers it would stay in the .pnpm store under a
 // version-stamped directory, and this copy would silently skip — leaving the
-// runtime to fall back to a CDN, which breaks offline use. Declaring it also
-// makes the version visible, which matters because the .jsep.wasm sits just
-// under the 25 MiB Workers asset cap (CI asserts this, see ci.yml).
+// runtime to fall back to a CDN, which breaks offline use.
 const ortSrcDir = path.join(root, '..', 'node_modules', 'onnxruntime-web', 'dist');
 if (!existsSync(ortSrcDir)) {
 	// Fail loudly: a missing runtime is not a degraded GPU path, it is a
@@ -138,8 +144,31 @@ if (!existsSync(ortSrcDir)) {
 	console.error('[setup-whisper-webgpu] is onnxruntime-web a direct dependency?');
 	process.exit(1);
 }
+
+// Copy EVERY ort-wasm-simd-threaded.* variant, not a hand-picked subset.
+// onnxruntime ships four builds — plain, .jsep, .jspi and .asyncify — and
+// chooses between them at runtime from the browser's capabilities. Copying only
+// .jsep shipped a runtime that worked in Chrome and broke in Firefox, which
+// lacks JSPI and so requests the .asyncify build; the missing file 404'd, the
+// SPA fallback answered with HTML, and onnxruntime reported the misleading
+// "no available backend found / error loading dynamically imported module".
+//
+// Globbing the family also means a future onnxruntime release that adds or
+// renames a variant is picked up automatically instead of failing the same way.
+// Only the variant a given browser selects is ever downloaded by a user, so
+// this costs deploy size, not load time.
+const ORT_PREFIX = 'ort-wasm-simd-threaded';
+const ortFiles = readdirSync(ortSrcDir).filter(
+	(name) => name.startsWith(`${ORT_PREFIX}.`) && (name.endsWith('.wasm') || name.endsWith('.mjs'))
+);
+if (ortFiles.length === 0) {
+	console.error(`[setup-whisper-webgpu] no ${ORT_PREFIX}.* files found in ${ortSrcDir}`);
+	process.exit(1);
+}
 mkdirSync(ortDir, { recursive: true });
-for (const file of ['ort-wasm-simd-threaded.jsep.wasm', 'ort-wasm-simd-threaded.jsep.mjs']) {
+for (const file of ortFiles) {
 	copyFileSync(path.join(ortSrcDir, file), path.join(ortDir, file));
 }
-console.log('[setup-whisper-webgpu] copied onnxruntime jsep runtime');
+console.log(
+	`[setup-whisper-webgpu] copied ${ortFiles.length} onnxruntime runtime files: ${ortFiles.join(', ')}`
+);
