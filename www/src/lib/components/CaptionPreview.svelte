@@ -54,5 +54,5 @@
 	/>
 </div>
 <p class="text-muted-foreground mt-1.5 text-center text-sm">
-	Preview of caption styling — cycles through your actual transcript, not the final video frame.
+	Preview of caption styling, cycling through your actual transcript rather than the final video frame.
 </p>

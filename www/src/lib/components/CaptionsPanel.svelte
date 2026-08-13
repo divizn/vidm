@@ -1,5 +1,17 @@
 <script lang="ts">
-	import { transcribeChunks, TRANSCRIBE_CHUNK_SECONDS, type AudioChunk } from '$lib/whisper/client';
+	import {
+		pickBackend,
+		transcribe,
+		backendLabel,
+		explainBackend,
+		isFixableByUser,
+		TRANSCRIBE_CHUNK_SECONDS,
+		type TranscribeProgress,
+		type BackendSelection,
+		type TranscriptionQuality
+	} from '$lib/whisper';
+	import type { AudioChunk } from '$lib/whisper/client';
+	import { wavToFloat32 } from '$lib/whisper/wav';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
@@ -40,8 +52,18 @@
 
 	let status = $state<Status>(segments.length ? 'done' : 'idle');
 	let progress = $state(0);
+	// 0 until the model download starts, 100 once weights are cached. Only the
+	// WebGPU path ever moves this — the CPU model is fetched by whisper.cpp
+	// itself with no progress signal.
+	let downloadPercent = $state(0);
 	let startedAt = $state(0);
 	let errorMessage = $state('');
+	// Which engine this run picked, and why. Null until the first run resolves
+	// it — there is nothing honest to display before detection has happened.
+	let engine = $state<BackendSelection | null>(null);
+	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
+	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
+	let quality = $state<TranscriptionQuality>('quality');
 	const etaSeconds = $derived(estimateRemainingSeconds(startedAt, progress));
 
 	// If trim changes after a transcript already exists, its timestamps no
@@ -160,9 +182,44 @@
 		return chunks;
 	}
 
+	// GPU path counterpart to extractAudioChunksForTranscription: same flags and
+	// the same re-encoding trim handling, but one continuous WAV instead of 30s
+	// segments, because transformers.js does its own overlapping-stride chunking
+	// and merges boundaries better than a hard cut can.
+	async function extractAudioForTranscription(): Promise<Float32Array> {
+		const ffmpeg = await loadFFmpeg();
+		const inputName = 'caption-audio-input.mp4';
+		const outputName = 'caption-audio.wav';
+		await ffmpeg.writeFile(inputName, await fetchFile(file));
+		await ffmpeg.exec([
+			...(trimActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : []),
+			'-i',
+			inputName,
+			'-vn',
+			'-ac',
+			'1',
+			'-ar',
+			'16000',
+			'-c:a',
+			'pcm_s16le',
+			outputName
+		]);
+
+		const data = (await ffmpeg.readFile(outputName)) as Uint8Array;
+		// Copy out before deleting, then free the virtual FS entries — this
+		// ffmpeg instance is shared with the export flow and outlives this call.
+		const samples = wavToFloat32(
+			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
+		);
+		await ffmpeg.deleteFile(inputName);
+		await ffmpeg.deleteFile(outputName);
+		return samples;
+	}
+
 	async function generate() {
 		status = 'transcribing';
 		progress = 0;
+		downloadPercent = 0;
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
@@ -170,8 +227,59 @@
 		generating = true;
 
 		try {
-			const chunks = await extractAudioChunksForTranscription();
-			segments = await transcribeChunks(chunks, (p) => (progress = p));
+			const selection = await pickBackend();
+			// Surfaced in the UI, not just the console: "why did this run on CPU"
+			// was unanswerable without devtools, and the most common cause
+			// (hardware acceleration switched off) is one the user can fix.
+			engine = selection;
+			// Restart the ETA clock at the first real transcription tick. Elapsed
+			// time before that point is model download plus (on the GPU path)
+			// shader compilation — one-off costs that don't recur per percent, so
+			// extrapolating from them made early estimates absurd: a run showing
+			// 3% reported ~51 minutes remaining.
+			let timingTranscription = false;
+			const onProgress = (update: TranscribeProgress) => {
+				if (update.phase === 'downloading') {
+					downloadPercent = Math.round(update.percent);
+				} else {
+					downloadPercent = 100;
+					if (!timingTranscription) {
+						timingTranscription = true;
+						startedAt = Date.now();
+					}
+					progress = Math.round(update.percent);
+				}
+			};
+
+			segments =
+				selection.backend === 'webgpu'
+					? await transcribe(
+							{
+								backend: 'webgpu',
+								getAudio: extractAudioForTranscription,
+								options: { quality, wordTimestamps: style.wordHighlight }
+							},
+							onProgress,
+							async () => {
+								// Reached only once the GPU attempt (extraction or
+								// transcription) has actually failed — restart the ETA
+								// clock and clear the download banner so the fallback's
+								// timing/UI isn't polluted by the failed attempt, then
+								// extract fresh audio for the CPU path (never reuse
+								// anything left over from the GPU attempt).
+								startedAt = Date.now();
+								downloadPercent = 0;
+								progress = 0;
+								// The badge claimed GPU; the run is finishing on CPU. Say
+								// so rather than leaving a stale, now-wrong label up.
+								engine = { backend: 'wasm', reason: 'adapter-error' };
+								return extractAudioChunksForTranscription();
+							}
+						)
+					: await transcribe(
+							{ backend: 'wasm', chunks: await extractAudioChunksForTranscription() },
+							onProgress
+						);
 			status = 'done';
 		} catch (err) {
 			status = 'error';
@@ -196,7 +304,7 @@
 {#if status === 'idle'}
 	{#if clearedByTrimChange}
 		<p class="text-muted-foreground text-sm">
-			Trim changed since these captions were generated, so they no longer match — regenerate to
+			Trim changed since these captions were generated, so they no longer match. Regenerate to
 			pick up the new range.
 		</p>
 	{/if}
@@ -209,15 +317,38 @@
 		</p>
 	{/if}
 {:else if status === 'transcribing'}
+	{#if downloadPercent > 0 && downloadPercent < 100}
+		<p class="text-muted-foreground text-sm">
+			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
+		</p>
+	{/if}
 	<p class="text-muted-foreground text-sm">
-		Transcribing… {progress}%{etaSeconds !== null ? ` — about ${formatEta(etaSeconds)} remaining` : ''}
+		Transcribing{engine ? ` on ${backendLabel(engine)}` : ''}… {progress}%{etaSeconds !== null
+			? `, about ${formatEta(etaSeconds)} remaining`
+			: ''}
 	</p>
+	{@render engineHint()}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
 	<Button onclick={generate}>Retry</Button>
 {/if}
 
+{#snippet engineHint()}
+	{#if engine && isFixableByUser(engine)}
+		<p class="text-muted-foreground text-sm">
+			Running on CPU because no GPU was available. Turning on hardware acceleration in your
+			browser settings, then reloading, will make transcription substantially faster.
+		</p>
+	{/if}
+{/snippet}
+
 {#if status === 'done'}
+	{#if engine}
+		<p class="text-muted-foreground text-xs" title={explainBackend(engine)}>
+			Transcribed on {backendLabel(engine)}
+		</p>
+	{/if}
+	{@render engineHint()}
 	<div class="space-y-1">
 		<h3 class="text-muted-foreground text-sm font-medium">Transcript</h3>
 		<p

@@ -5,6 +5,10 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual escape hatch: the R2 upload gate below only fires on a change to
+  # specific tracked files, so a failed or missed upload (or a bucket wiped
+  # out of band) can't otherwise be re-run without an empty commit.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -28,6 +32,18 @@ jobs:
           cache: pnpm
           cache-dependency-path: www/pnpm-lock.yaml
 
+      # postinstall downloads the ~32MB whisper model from HuggingFace —
+      # pnpm's own cache above only covers node_modules, not static/. Without this, every run on every PR re-downloads all of it:
+      # slow, and a third-party outage becomes a red build on unrelated
+      # changes. Keyed on the setup scripts (tracked, so a model/revision
+      # change busts the cache automatically); safe because both scripts are
+      # idempotent and download atomically via a temp file.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            www/static/whisper
+          key: model-assets-${{ hashFiles('www/scripts/setup-whisper.mjs') }}
+
       - run: pnpm install --frozen-lockfile
 
       - run: pnpm check
@@ -46,7 +62,9 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -71,6 +89,14 @@ jobs:
           cache: pnpm
           cache-dependency-path: www/pnpm-lock.yaml
 
+      # See the matching step in the test job: postinstall downloads the
+      # ~32MB whisper model, and only this cache avoids re-fetching it here.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            www/static/whisper
+          key: model-assets-${{ hashFiles('www/scripts/setup-whisper.mjs') }}
+
       # wrangler-action checks for an already-installed `wrangler` first and
       # only falls back to installing its own pinned default if none is
       # found — that default (3.90.0) predates wrangler.jsonc/JSONC config
@@ -89,23 +115,54 @@ jobs:
           name: build
           path: www/build
 
-      # ffmpeg-core.wasm and the whisper model are large (tens of MB) and
-      # almost never change — re-uploading them to R2 on every deploy costs
-      # real time for no reason, so only do it when this push actually
-      # touched one of them.
+      # ffmpeg-core.wasm and the whisper model are large and almost never
+      # change — re-uploading them to R2
+      # on every deploy costs real time for no reason, so only do it when
+      # this push actually touched one of them.
+      #
+      # The previous version of this check diffed the asset files themselves —
+      # but they're gitignored and untracked, so `git diff` was always quiet and
+      # this step never once fired. The tracked setup scripts (plus the
+      # lockfile, since a dependency bump can change what they download
+      # without editing the script itself) are the real source of truth for
+      # which assets should exist, so diff those instead.
+      #
+      # No `www/` prefix on these pathspecs: this is a `run:` step, and the
+      # job sets `defaults.run.working-directory: www`, so `git diff -- ...`
+      # already resolves pathspecs relative to `www/`. Adding `www/` here
+      # would look for `www/www/...`, match nothing, and silently make this
+      # step dead code again (exactly the bug being fixed right now).
+      # Contrast with the `actions/cache` step above: its `path:` and
+      # `hashFiles()` are action *inputs*, not shell pathspecs — those are
+      # always resolved relative to the repo root regardless of
+      # working-directory, which is why that step correctly keeps the
+      # `www/` prefix. That asymmetry between a `run:` step's shell cwd and
+      # a `uses:` action's own input resolution is exactly what makes this
+      # bug easy to reintroduce — check both conventions before editing
+      # either kind of step here.
+      #
+      # workflow_dispatch has no before/after commit range to diff, so
+      # treat a manual run as always wanting a re-upload — that's the whole
+      # point of the manual trigger: recovering from a failed or missed
+      # upload without an empty commit.
       - name: Check if large R2 assets changed
         id: r2-assets
         run: |
-          if git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- static/ffmpeg/ffmpeg-core.wasm static/whisper/ggml-tiny.en-q5_1.bin; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          elif git diff --quiet ${{ github.event.before }} ${{ github.event.after }} -- \
+            scripts/copy-ffmpeg-core.mjs \
+            scripts/setup-whisper.mjs \
+            pnpm-lock.yaml; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
           fi
 
-      # ffmpeg-core.wasm and the whisper model exceed Workers static
-      # assets' 25 MiB per-file limit — deployed to R2 instead (see
-      # worker.ts) and stripped from the static output here so the
-      # assets upload doesn't reject the deploy.
+      # ffmpeg-core.wasm and the whisper model exceed Workers static assets'
+      # 25 MiB per-file limit —
+      # deployed to R2 instead (see worker.ts) and stripped from the static
+      # output here so the assets upload doesn't reject the deploy.
       - uses: cloudflare/wrangler-action@v3
         if: steps.r2-assets.outputs.changed == 'true'
         with:
@@ -121,8 +178,8 @@ jobs:
       # rejects it as an infinite-loop redirect (it's not a redirect there,
       # just a rewrite, unlike Pages). SPA fallback is instead handled by
       # `not_found_handling: "single-page-application"` in wrangler.jsonc,
-      # so the generated file is just noise; strip it same as the two
-      # oversized files below.
+      # so the generated file is just noise; strip it same as the oversized
+      # files below.
       - run: rm -f build/_redirects build/ffmpeg/ffmpeg-core.wasm build/whisper/ggml-tiny.en-q5_1.bin
 
       - uses: cloudflare/wrangler-action@v3

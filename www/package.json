@@ -16,6 +16,7 @@
 	"dependencies": {
 		"@ffmpeg/ffmpeg": "^0.12.15",
 		"@ffmpeg/util": "^0.12.2",
+		"@huggingface/transformers": "4.2.0",
 		"@lucide/svelte": "^1.30.0",
 		"@transcribe/shout": "^1.0.7",
 		"@transcribe/transcriber": "^3.0.1",
@@ -30,6 +31,7 @@
 		"@sveltejs/kit": "^2.47.1",
 		"@sveltejs/vite-plugin-svelte": "^6.2.1",
 		"@tailwindcss/vite": "^4.3.3",
+		"onnxruntime-web": "1.26.0-dev.20260416-b7804b056c",
 		"svelte": "^5.41.0",
 		"svelte-check": "^4.3.3",
 		"tailwindcss": "^4.3.3",

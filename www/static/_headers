@@ -2,10 +2,10 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
 
-# Large WASM/model assets served from R2 via Pages Functions (see
-# functions/ffmpeg, functions/whisper) — immutable, versioned by
-# filename in practice (these don't change without a code change), so
-# cache them for a year rather than re-downloading ~62MB on every visit.
+# Large WASM/model assets served from R2 via worker.ts (Workers migration —
+# these used to be Pages Functions) — immutable, versioned by filename in
+# practice (these don't change without a code change), so cache them for a
+# year rather than re-downloading on every visit.
 /ffmpeg/ffmpeg-core.wasm
   Cache-Control: public, max-age=31536000, immutable
 

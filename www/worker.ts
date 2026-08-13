@@ -1,12 +1,17 @@
 /// <reference path="./worker-configuration.d.ts" />
 
-// ffmpeg-core.wasm and the whisper model both exceed Workers static assets'
-// 25 MiB individual file-size cap (same limit Pages had) — both are
-// excluded from the deployed static asset directory (stripped post-build,
-// see deploy.yml) and served from R2 here instead. Same-origin, so no
-// COEP/CORS concerns.
+// ffmpeg-core.wasm, the whisper model, and the two WebGPU whisper ONNX
+// weights all exceed Workers static assets' 25 MiB individual file-size cap
+// (same limit Pages had) — all four are excluded from the deployed static
+// asset directory (stripped post-build, see deploy.yml) and served from R2
+// here instead. Same-origin, so no COEP/CORS concerns.
 //
-// Neither of these paths matches a file in the static assets directory, so
+// ort-wasm-simd-threaded.jsep.wasm (the onnxruntime WebGPU runtime) is 24.9
+// MiB — under the cap, but with almost no margin; a routine onnxruntime
+// version bump could push it over (see the CI size-assertion step in
+// ci.yml).
+//
+// None of these paths match a file in the static assets directory, so
 // Workers' default asset-first routing already falls through to this
 // Worker for them without any extra routing config (the Pages-era
 // _routes.json scoping is gone for the same reason — nothing left to
@@ -16,7 +21,10 @@ const R2_ROUTES: Record<string, { key: string; contentType: string }> = {
 	'/whisper/ggml-tiny.en-q5_1.bin': {
 		key: 'ggml-tiny.en-q5_1.bin',
 		contentType: 'application/octet-stream'
-	}
+	},
+	// GPU (WebGPU) transcription is shelved — see GPU_TRANSCRIPTION_ENABLED in
+	// src/lib/whisper/backend.ts. Its ONNX weights have been deleted from the
+	// bucket, so no routes for them here; restore both together if it resumes.
 };
 
 async function serveFromR2(

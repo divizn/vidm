@@ -33,8 +33,10 @@ function crossOriginIsolation(): Plugin {
 export default defineConfig({
 	plugins: [crossOriginIsolation(), tailwindcss(), sveltekit()],
 	optimizeDeps: {
-		// Pre-bundling breaks @ffmpeg/ffmpeg's internal Web Worker loading.
-		exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util']
+		// Pre-bundling breaks @ffmpeg/ffmpeg's internal Web Worker loading, and
+		// rewrites the onnxruntime wasm/worker resolution that transformers.js
+		// depends on.
+		exclude: ['@ffmpeg/ffmpeg', '@ffmpeg/util', '@huggingface/transformers']
 	},
 	test: {
 		// Unit tests only cover pure logic (filters.ts, srt.ts) — no DOM,

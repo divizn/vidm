@@ -1,5 +1,8 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
+import { createEngineLog } from '$lib/log';
+
+export const ffmpegLog = createEngineLog('ffmpeg');
 
 // Self-hosted, multi-threaded core — needs COOP/COEP (see vite.config.ts).
 const CORE_BASE_URL = '/ffmpeg';
@@ -36,7 +39,7 @@ export function resetFFmpeg(): void {
 
 async function loadFFmpegInstance(): Promise<FFmpeg> {
 	const ffmpeg = new FFmpeg();
-	ffmpeg.on('log', ({ message }) => console.debug('[ffmpeg]', message));
+	ffmpeg.on('log', ({ message }) => ffmpegLog.line(message));
 
 	await ffmpeg.load({
 		coreURL: await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.js`, 'text/javascript'),

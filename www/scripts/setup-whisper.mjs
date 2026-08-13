@@ -1,6 +1,6 @@
 // Self-hosts whisper.cpp's WASM build (@transcribe/shout) and the GGML
 // model — no CDN dependency, matches the ffmpeg-core self-hosting pattern.
-import { existsSync, mkdirSync, copyFileSync, createWriteStream } from 'node:fs';
+import { existsSync, mkdirSync, copyFileSync, createWriteStream, renameSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import https from 'node:https';
@@ -48,9 +48,35 @@ function download(url, dest) {
 					reject(new Error(`HTTP ${res.statusCode} downloading ${url}`));
 					return;
 				}
-				const file = createWriteStream(dest);
+				// Write to a temp path in the same directory, then rename into
+				// place only once the transfer has fully succeeded. A same-dir
+				// rename is atomic; without this, a connection drop, process
+				// kill, or full disk mid-write leaves a truncated file sitting
+				// at `dest` — exactly the path the idempotency check
+				// (existsSync(dest)) tests — so the next run would treat the
+				// corrupt file as "already present" and never retry it.
+				const tempDest = `${dest}.tmp-${process.pid}`;
+				const cleanupTemp = () => {
+					if (existsSync(tempDest)) unlinkSync(tempDest);
+				};
+				const file = createWriteStream(tempDest);
+				res.on('error', (err) => {
+					file.destroy();
+					cleanupTemp();
+					reject(err);
+				});
+				file.on('error', (err) => {
+					res.destroy();
+					cleanupTemp();
+					reject(err);
+				});
 				res.pipe(file);
-				file.on('finish', () => file.close(resolve));
+				file.on('finish', () => {
+					file.close(() => {
+						renameSync(tempDest, dest);
+						resolve();
+					});
+				});
 			})
 			.on('error', reject);
 	});

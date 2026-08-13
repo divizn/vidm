@@ -1,5 +1,8 @@
 import { FileTranscriber, type TranscribeToken } from '@transcribe/transcriber';
 import { parseSrtTimestamp, formatSrtTimestamp, type CaptionSegment, type CaptionWord } from './srt';
+import { createEngineLog } from '$lib/log';
+
+const cpuLog = createEngineLog('whisper-cpu');
 
 // Self-hosted, same COOP/COEP setup as ffmpeg-core-mt (see vite.config.ts).
 // Loaded via dynamic import of the absolute static URL (not a bare package
@@ -62,15 +65,26 @@ export async function transcribeChunks(
 	chunks: AudioChunk[],
 	onProgress?: (percent: number) => void
 ): Promise<CaptionSegment[]> {
+	cpuLog.clear();
+	console.info(
+		`[vidm:whisper-cpu] transcribing ${chunks.length} chunk(s) with whisper.cpp (WASM, CPU)`
+	);
 	const { default: createModule } = await import(/* @vite-ignore */ SHOUT_URL);
 
 	const transcriber = new FileTranscriber({
 		createModule,
 		model: MODEL_URL,
-		print: (msg) => console.log('[whisper stdout]', msg),
-		printErr: (msg) => console.error('[whisper stderr]', msg),
-		onAbort: () => console.error('[whisper] Module.onAbort fired'),
-		onExit: (status) => console.error('[whisper] Module.onExit fired', status)
+		// stderr carries whisper.cpp's ordinary banner, so it is not an error stream.
+		print: (msg) => cpuLog.line(msg),
+		printErr: (msg) => cpuLog.line(msg),
+		onAbort: () => {
+			console.error('[vidm:whisper-cpu] whisper.cpp aborted');
+			cpuLog.dumpRecent('abort');
+		},
+		onExit: (status) => {
+			console.error('[vidm:whisper-cpu] whisper.cpp exited', status);
+			cpuLog.dumpRecent('exit');
+		}
 	});
 
 	await transcriber.init();
@@ -97,6 +111,9 @@ export async function transcribeChunks(
 				});
 			}
 		}
+	} catch (err) {
+		cpuLog.dumpRecent('transcription failure');
+		throw err;
 	} finally {
 		transcriber.destroy();
 	}

@@ -124,5 +124,5 @@ export function buildMissingOptionsMessage(toolStates: ToolState[]): string {
 	} else {
 		joined = `${labels.slice(0, -1).join(', ')}, or ${labels.at(-1)}`;
 	}
-	return `Select at least one option — ${joined} — to export.`;
+	return `Select at least one option to export: ${joined}.`;
 }
