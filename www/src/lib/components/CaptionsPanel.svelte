@@ -41,7 +41,7 @@
 		trimStart: number;
 		trimEnd: number;
 		sourceDuration: number;
-		// True while a transcription is in flight — lets the parent lock trim
+		// True while a transcription is in flight: lets the parent lock trim
 		// editing for the duration, since extractAudioForTranscription below
 		// captures trimStart/trimEnd once at the start of the run and a mid-flight
 		// trim change would silently desync the eventual transcript from the
@@ -56,7 +56,7 @@
 	let status = $state<Status>(segments.length ? 'done' : 'idle');
 	let progress = $state(0);
 	// 0 until the model download starts, 100 once weights are cached. Only the
-	// WebGPU path ever moves this — the CPU model is fetched by whisper.cpp
+	// WebGPU path ever moves this: the CPU model is fetched by whisper.cpp
 	// itself with no progress signal.
 	let downloadPercent = $state(0);
 	let startedAt = $state(0);
@@ -80,11 +80,11 @@
 	});
 
 	// If trim changes after a transcript already exists, its timestamps no
-	// longer correspond to the new range — clear it rather than leaving it
+	// longer correspond to the new range: clear it rather than leaving it
 	// silently stale, same philosophy as editSegmentText dropping word-level
 	// timing on a manual edit. clearedByTrimChange drives an explanatory
 	// message so this doesn't look like captions just vanished for no
-	// reason — reset the moment a fresh transcript exists again.
+	// reason, reset the moment a fresh transcript exists again.
 	let prevTrimStart = trimStart;
 	let prevTrimEnd = trimEnd;
 	let clearedByTrimChange = $state(false);
@@ -107,30 +107,30 @@
 
 	function editSegmentText(index: number, text: string) {
 		// Editing invalidates that segment's word-level timing (it no longer
-		// matches the edited text), so drop it — burn-in falls back to
+		// matches the edited text), so drop it: burn-in falls back to
 		// plain (non-karaoke) text for this segment instead of highlighting
 		// against stale word boundaries.
 		segments[index] = { ...segments[index], text, words: undefined };
 	}
 
-	// Always extracts a clean mono 16kHz WAV via ffmpeg before transcribing
-	// — not just when trim is active. Whisper's own audio loader
+	// Always extracts a clean mono 16kHz WAV via ffmpeg before transcribing,
+	// not just when trim is active. Whisper's own audio loader
 	// (@transcribe/transcriber's audioFileToPcm32) hands the raw file
 	// straight to the browser's decodeAudioData(), which can fail on
 	// large/high-bitrate video (confirmed: a 140MB, ~39Mbps 2560x1440
-	// screen recording reliably failed there) — and that library swallows
+	// screen recording reliably failed there), and that library swallows
 	// the real decode error, returning null, which then crashes deep in
 	// the whisper WASM module trying to read `.length` off it. Extracting
 	// a small, uncompressed, already-whisper-format audio file up front
 	// sidesteps the browser's container decoding entirely, for every file
 	// (trimmed or not), not just an edge case.
 	// Re-encodes (doesn't stream-copy) so an active trim's cut lands
-	// exactly at trimStart — a copy-mode trim can only cut at keyframes,
+	// exactly at trimStart: a copy-mode trim can only cut at keyframes,
 	// which could desync the transcript from the frame-accurate trim the
 	// real export applies later.
 	// Splits the extracted audio into TRANSCRIBE_CHUNK_SECONDS-long WAV
 	// files via ffmpeg's segment muxer in the same pass, rather than
-	// extracting one long WAV and slicing it in JS — see
+	// extracting one long WAV and slicing it in JS, see
 	// TRANSCRIBE_CHUNK_SECONDS for why chunked transcription exists.
 	async function extractAudioChunksForTranscription(): Promise<AudioChunk[]> {
 		const ffmpeg = await loadFFmpeg();
@@ -172,7 +172,7 @@
 		}
 
 		// This ffmpeg instance is shared with (and outlives this call into)
-		// the main export flow — leaving these behind on its virtual FS just
+		// the main export flow: leaving these behind on its virtual FS just
 		// adds unnecessary memory pressure for whatever runs next, so clean
 		// up now that the chunk data has been copied out into `chunks`.
 		await ffmpeg.deleteFile(inputName);
@@ -207,7 +207,7 @@
 		]);
 
 		const data = (await ffmpeg.readFile(outputName)) as Uint8Array;
-		// Copy out before deleting, then free the virtual FS entries — this
+		// Copy out before deleting, then free the virtual FS entries: this
 		// ffmpeg instance is shared with the export flow and outlives this call.
 		const samples = wavToFloat32(
 			data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer
@@ -232,7 +232,7 @@
 			const selection = await pickBackend();
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
-			// shader compilation — one-off costs that don't recur per percent, so
+			// shader compilation, one-off costs that don't recur per percent, so
 			// extrapolating from them made early estimates absurd: a run showing
 			// 3% reported ~51 minutes remaining.
 			let timingTranscription = false;
@@ -295,7 +295,7 @@
 							onProgress,
 							async () => {
 								// Reached only once the GPU attempt (extraction or
-								// transcription) has actually failed — restart the ETA
+								// transcription) has actually failed, restart the ETA
 								// clock and clear the download banner so the fallback's
 								// timing/UI isn't polluted by the failed attempt, then
 								// extract fresh audio for the CPU path (never reuse

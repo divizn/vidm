@@ -93,7 +93,7 @@ describe('wavToFloat32', () => {
 		expect(() => wavToFloat32(new ArrayBuffer(64))).toThrow(/RIFF|WAVE/i);
 	});
 
-	// The ASR pipeline does not resample — a wrong rate silently garbles the
+	// The ASR pipeline does not resample: a wrong rate silently garbles the
 	// transcript instead of failing, so reject it here where it is visible.
 	it('throws on a sample rate other than 16kHz', () => {
 		expect(() => wavToFloat32(buildWav([0, 1], [], { sampleRate: 44100 }))).toThrow(/16000|sample rate/i);

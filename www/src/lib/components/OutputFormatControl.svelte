@@ -49,7 +49,7 @@
 				{/each}
 			</RadioGroup>
 			<p class="text-muted-foreground text-sm">
-				GIFs have no audio — Volume and Compression are disabled while GIF is selected.
+				GIFs have no audio: Volume and Compression are disabled while GIF is selected.
 			</p>
 		</div>
 	{/if}

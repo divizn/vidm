@@ -12,18 +12,18 @@ import { createEngineLog } from '$lib/log';
 // callback_function below for why this is not optional.
 const gpuLog = createEngineLog('whisper-gpu');
 
-// Everything is served from this origin — no CDN at runtime, which is what
+// Everything is served from this origin, no CDN at runtime, which is what
 // makes offline use possible and keeps load timing controllable.
 env.allowRemoteModels = false;
 env.allowLocalModels = true;
 env.localModelPath = '/models/';
 // `backends.onnx` types `wasm` as optional (it's a `Partial<Env>`), but
-// transformers.js always populates it before this module can reach it — so
+// transformers.js always populates it before this module can reach it, so
 // asserting just this property is a narrow, load-bearing assertion, not a
 // blanket `any` cast that would hide a real runtime-path misconfiguration.
 env.backends.onnx.wasm!.wasmPaths = '/ort/';
 
-// Local model ids, which are also the directory names under static/models/ —
+// Local model ids, which are also the directory names under static/models/,
 // they must match the `dir` values in scripts/setup-whisper-webgpu.mjs.
 export const QUALITY_MODEL_ID = 'whisper-webgpu';
 export const FAST_MODEL_ID = 'whisper-webgpu-fast';
@@ -32,7 +32,7 @@ export const FAST_MODEL_ID = 'whisper-webgpu-fast';
 // downloaded for that tier (scripts/setup-whisper-webgpu.mjs `decoderDtype`).
 //
 // The quality tier is fp16, NOT 4-bit: a q4f16 decoder produced transcripts
-// with words repeating ten or more times, identically in Chrome and Firefox —
+// with words repeating ten or more times, identically in Chrome and Firefox,
 // the classic signature of an over-quantized Whisper decoder stuck in a
 // repetition loop. Browser-independence is what ruled out WebGPU itself.
 // int8 was chosen over fp16 on a mistaken belief that a 100 MB upload limit
@@ -44,7 +44,7 @@ const DECODER_DTYPE: Record<string, 'fp16' | 'q4f16' | 'int8'> = {
 };
 
 // Windowing knobs handed to the ASR pipeline below for its own long-audio
-// chunking — kept as named constants because chunk-progress.ts's window-count
+// chunking, kept as named constants because chunk-progress.ts's window-count
 // math has to replicate the exact same values to stay in sync with it.
 const CHUNK_LENGTH_S = 30;
 const STRIDE_LENGTH_S = 5;
@@ -60,7 +60,7 @@ export type WorkerRequest = {
 	// DTW pass over cross-attentions, so it's skipped when the caption style
 	// isn't highlighting words. Note the attention tensors themselves are
 	// computed either way: ONNX Runtime returns every declared graph output, and
-	// the `_timestamped` export declares them — only a different export would
+	// the `_timestamped` export declares them, only a different export would
 	// avoid that, at the cost of a second model per tier.
 	wordTimestamps: boolean;
 };
@@ -77,7 +77,7 @@ async function getPipeline(modelId: string, post: (m: WorkerResponse) => void) {
 	// transformers.js resolves 'webgpu' through deviceToExecutionProviders,
 	// which THROWS on an unsupported device rather than quietly downgrading to
 	// wasm. So reaching the line after this await is positive proof the WebGPU
-	// execution provider was actually accepted — not merely requested. Any
+	// execution provider was actually accepted, not merely requested. Any
 	// failure propagates to the dispatcher, which logs the downgrade and runs
 	// the CPU path.
 	const decoderDtype = DECODER_DTYPE[modelId] ?? 'fp16';
@@ -112,7 +112,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 		// Real per-chunk progress instead of the single fire-once-at-0 event
 		// this worker used to send: WhisperTextStreamer decodes the model's
 		// own interleaved `<|time|>` tokens as they're generated (still
-		// present even in 'word' timestamp mode — see
+		// present even in 'word' timestamp mode, see
 		// WhisperGenerationConfig.return_timestamps, forced true above), and
 		// chunk-progress.ts turns that per-window-local timestamp stream into
 		// one running fraction across the whole clip.
@@ -122,7 +122,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 		const tracker = new WindowProgressTracker(totalWindows, jumpSeconds, durationSeconds);
 
 		// Same time_precision formula the pipeline computes for itself in
-		// AutomaticSpeechRecognitionPipeline._call_whisper — matching it keeps
+		// AutomaticSpeechRecognitionPipeline._call_whisper, matching it keeps
 		// the streamer's timestamps in the same units the pipeline uses. The
 		// public Processor/PreTrainedModel types don't capture these
 		// Whisper-specific config fields (the pipeline's own source works
@@ -141,7 +141,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 			{
 				time_precision: timePrecision,
 				// MUST be supplied. TextStreamer defaults callback_function to
-				// `stdout_write`, which in a browser is `console.log` — so leaving
+				// `stdout_write`, which in a browser is `console.log`, so leaving
 				// it unset prints every decoded token to the console. That is not
 				// merely noisy: with devtools open, thousands of synchronous
 				// console writes dominate the run and made GPU transcription look
@@ -153,11 +153,11 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 				// Fires once per window's generate(). The coarse but dependable
 				// signal: on_chunk_start only fires on segment boundaries, so a
 				// window holding one long unbroken utterance emits nothing and the
-				// bar looks frozen — which is exactly what a long clip did.
+				// bar looks frozen, which is exactly what a long clip did.
 				on_finalize: () => {
 					const percent = tracker.completeWindow() * 100;
 					console.info(
-						`[vidm:whisper-gpu] window complete — ${percent.toFixed(0)}% of ${totalWindows}-window clip`
+						`[vidm:whisper-gpu] window complete: ${percent.toFixed(0)}% of ${totalWindows}-window clip`
 					);
 					post({ type: 'progress', phase: 'transcribing', percent });
 				}
@@ -171,7 +171,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
 			return_timestamps: event.data.wordTimestamps ? 'word' : true,
 			chunk_length_s: CHUNK_LENGTH_S,
 			// Overlapping stride is why this path handles chunk boundaries better
-			// than the CPU path's hard 30s cuts — words spanning a boundary get
+			// than the CPU path's hard 30s cuts: words spanning a boundary get
 			// merged instead of mangled.
 			stride_length_s: STRIDE_LENGTH_S,
 			streamer

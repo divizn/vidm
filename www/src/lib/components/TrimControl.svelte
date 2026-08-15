@@ -17,7 +17,7 @@
 	} = $props();
 
 	// Text inputs are one-way (value= not bind:value=) and commit on
-	// change/blur rather than every keystroke — re-formatting the field on
+	// change/blur rather than every keystroke: re-formatting the field on
 	// every keystroke (which a two-way bind would do, since trimStart
 	// changing re-renders the formatted string) would fight the user
 	// mid-type.

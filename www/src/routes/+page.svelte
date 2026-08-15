@@ -85,7 +85,7 @@
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('format');
-	// True while CaptionsPanel has a transcription in flight — locks trim
+	// True while CaptionsPanel has a transcription in flight: locks trim
 	// editing for the duration (see CaptionsPanel's own `generating` prop
 	// comment): a mid-transcription trim change would silently desync the
 	// eventual transcript from the range it actually covers, since the
@@ -93,13 +93,13 @@
 	let captionsGenerating = $state(false);
 	let trimStart = $state(0);
 	// 0 doubles as "not yet initialized" until sourceDuration loads (see the
-	// $effect below) — TrimControl and buildExportSummary both treat
+	// $effect below): TrimControl and buildExportSummary both treat
 	// trimEnd < sourceDuration as "trim active", so this must become the
 	// real duration before either renders anything trim-related.
 	let trimEnd = $state(0);
 
 	// Mirrors how `crop` gets derived from source dimensions once metadata
-	// loads (see SourcePreview) — trim defaults to the full range the first
+	// loads (see SourcePreview): trim defaults to the full range the first
 	// time sourceDuration becomes available for the current file.
 	$effect(() => {
 		if (sourceDuration > 0 && trimEnd === 0) {
@@ -107,7 +107,7 @@
 		}
 	});
 
-	// Single source of truth for "which tools are doing something" — every
+	// Single source of truth for "which tools are doing something": every
 	// other per-tool list below (hasActiveTransform, each tab's enabled dot,
 	// the export summary line, the "select at least one option" guard
 	// message) derives from this instead of separately re-deriving the same
@@ -156,7 +156,7 @@
 	);
 
 	// The crop box only overlays the video while actively viewing the
-	// Reformat tab in crop mode — showing it while the user is looking at
+	// Reformat tab in crop mode: showing it while the user is looking at
 	// a different tool's panel would be irrelevant clutter.
 	const showCropBox = $derived(mode === 'crop' && activeTool === 'reformat');
 
@@ -243,7 +243,7 @@
 
 			ffmpeg.off('progress', offProgress as never);
 			status = 'done';
-			// Client-side navigation (not a hard reload) — the blob URL above
+			// Client-side navigation (not a hard reload): the blob URL above
 			// stays valid since it's still the same document. The /export
 			// page's "back" button does the hard reload this app actually
 			// needs before the next conversion (see its own comment).

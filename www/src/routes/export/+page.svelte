@@ -3,7 +3,7 @@
 	import VideoPreview from '$lib/components/VideoPreview.svelte';
 	import { Button } from '$lib/components/ui/button';
 
-	// A real full-page navigation, not SvelteKit's client-side goto() — a
+	// A real full-page navigation, not SvelteKit's client-side goto(): a
 	// fresh document is required so a new FFmpeg() instance can load
 	// cleanly for the next conversion (see the never-two-instances
 	// constraint in $lib/ffmpeg/client.ts). This is also literally the

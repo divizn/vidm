@@ -29,12 +29,12 @@
 				writeCache(data.stargazers_count);
 			}
 		} catch {
-			// Offline or rate-limited — leave whatever's already shown (cached
+			// Offline or rate-limited: leave whatever's already shown (cached
 			// count, or nothing) as-is; no error state for a decorative footer.
 		}
 	}
 
-	// SSR is disabled app-wide, so this only ever runs in the browser — no
+	// SSR is disabled app-wide, so this only ever runs in the browser, no
 	// window/navigator guards needed at the call site.
 	const cached = readCache();
 	if (cached) starCount = cached.count;

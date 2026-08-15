@@ -10,13 +10,13 @@
 
 	let previewTime = $state(segments[0] ? parseSrtTimestamp(segments[0].from) : 0);
 
-	// Auto-cycles the preview's synthetic clock — there's no real video/audio
+	// Auto-cycles the preview's synthetic clock: there's no real video/audio
 	// to drive it, so this is a standalone rAF loop instead of a `timeupdate`
 	// listener. `segments` is read fresh on every tick via the reactive prop
 	// (not a snapshot captured at effect-start), so editing caption text
 	// mid-preview stays in sync without restarting the loop.
 	//
-	// Checked once (not reactively) — there's no scrubbing/pause control by
+	// Checked once (not reactively): there's no scrubbing/pause control by
 	// design, so a user with prefers-reduced-motion set just gets the preview
 	// parked on the first segment's start instead of looping indefinitely.
 	const prefersReducedMotion =

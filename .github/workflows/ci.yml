@@ -32,7 +32,7 @@ jobs:
           cache: pnpm
           cache-dependency-path: www/pnpm-lock.yaml
 
-      # postinstall downloads the ~32MB whisper model from HuggingFace —
+      # postinstall downloads the ~32MB whisper model from HuggingFace.
       # pnpm's own cache above only covers node_modules, not static/. Without this, every run on every PR re-downloads all of it:
       # slow, and a third-party outage becomes a red build on unrelated
       # changes. Keyed on the setup scripts (tracked, so a model/revision
@@ -53,7 +53,7 @@ jobs:
       - run: pnpm build
 
       # deploy re-uses this build output instead of rebuilding from scratch
-      # (see deploy job) — same install, same source, no reason to redo it.
+      # (see deploy job): same install, same source, no reason to redo it.
       - uses: actions/upload-artifact@v4
         with:
           name: build
@@ -75,7 +75,7 @@ jobs:
           fetch-depth: 0
 
       # wrangler-action@v3 shells out via the detected package manager
-      # (`pnpm dlx wrangler ...`) rather than bundling its own binary —
+      # (`pnpm dlx wrangler ...`) rather than bundling its own binary:
       # without pnpm on PATH it fails with "Unable to locate executable
       # file: pnpm" (confirmed: this is what broke the previous deploy
       # after these steps were dropped as "unused").
@@ -99,7 +99,7 @@ jobs:
 
       # wrangler-action checks for an already-installed `wrangler` first and
       # only falls back to installing its own pinned default if none is
-      # found — that default (3.90.0) predates wrangler.jsonc/JSONC config
+      # found: that default (3.90.0) predates wrangler.jsonc/JSONC config
       # support, so it can't locate the entry point at all and fails with
       # "Missing entry-point" (confirmed: this repo's own devDependency is
       # wrangler ^4, which resolves wrangler.jsonc fine). Installing here
@@ -108,7 +108,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       # Reuses the build `test` already produced from the same commit
-      # instead of rebuilding — `test` is a required dependency (needs:
+      # instead of rebuilding: `test` is a required dependency (needs:
       # test) so this artifact always exists by the time deploy runs.
       - uses: actions/download-artifact@v4
         with:
@@ -116,11 +116,11 @@ jobs:
           path: www/build
 
       # ffmpeg-core.wasm and the whisper model are large and almost never
-      # change — re-uploading them to R2
+      # change: re-uploading them to R2
       # on every deploy costs real time for no reason, so only do it when
       # this push actually touched one of them.
       #
-      # The previous version of this check diffed the asset files themselves —
+      # The previous version of this check diffed the asset files themselves,
       # but they're gitignored and untracked, so `git diff` was always quiet and
       # this step never once fired. The tracked setup scripts (plus the
       # lockfile, since a dependency bump can change what they download
@@ -133,16 +133,16 @@ jobs:
       # would look for `www/www/...`, match nothing, and silently make this
       # step dead code again (exactly the bug being fixed right now).
       # Contrast with the `actions/cache` step above: its `path:` and
-      # `hashFiles()` are action *inputs*, not shell pathspecs — those are
+      # `hashFiles()` are action *inputs*, not shell pathspecs: those are
       # always resolved relative to the repo root regardless of
       # working-directory, which is why that step correctly keeps the
       # `www/` prefix. That asymmetry between a `run:` step's shell cwd and
       # a `uses:` action's own input resolution is exactly what makes this
-      # bug easy to reintroduce — check both conventions before editing
+      # bug easy to reintroduce: check both conventions before editing
       # either kind of step here.
       #
       # workflow_dispatch has no before/after commit range to diff, so
-      # treat a manual run as always wanting a re-upload — that's the whole
+      # treat a manual run as always wanting a re-upload: that's the whole
       # point of the manual trigger: recovering from a failed or missed
       # upload without an empty commit.
       - name: Check if large R2 assets changed
@@ -160,7 +160,7 @@ jobs:
           fi
 
       # ffmpeg-core.wasm and the whisper model exceed Workers static assets'
-      # 25 MiB per-file limit —
+      # 25 MiB per-file limit,
       # deployed to R2 instead (see worker.ts) and stripped from the static
       # output here so the assets upload doesn't reject the deploy.
       - uses: cloudflare/wrangler-action@v3
@@ -174,7 +174,7 @@ jobs:
             r2 object put vidm-assets/ggml-tiny.en-q5_1.bin --file=static/whisper/ggml-tiny.en-q5_1.bin --content-type=application/octet-stream --cache-control=public,max-age=31536000,immutable
 
       # adapter-static's fallback:'index.html' generates a Pages-style
-      # `/* /index.html 200` _redirects rule for SPA fallback — Workers
+      # `/* /index.html 200` _redirects rule for SPA fallback: Workers
       # rejects it as an infinite-loop redirect (it's not a redirect there,
       # just a rewrite, unlike Pages). SPA fallback is instead handled by
       # `not_found_handling: "single-page-application"` in wrangler.jsonc,

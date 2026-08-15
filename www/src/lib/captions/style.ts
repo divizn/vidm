@@ -2,7 +2,7 @@ export type CaptionPosition = 'top' | 'middle' | 'bottom';
 
 export interface CaptionFont {
 	label: string;
-	// Must match the font file's internal family name — libass's fontselect
+	// Must match the font file's internal family name: libass's fontselect
 	// (no fontconfig in this build) matches purely by name against whatever
 	// fontsdir points at, not by filename.
 	assFamily: string;
@@ -26,11 +26,11 @@ export interface CaptionStyle {
 	font: CaptionFont;
 	position: CaptionPosition;
 	textColor: string; // #rrggbb
-	highlightColor: string; // #rrggbb — active-word color, karaoke-style
+	highlightColor: string; // #rrggbb, active-word color, karaoke-style
 	fontSizePercent: number; // font size as a percentage of output height
 	// Karaoke-style per-word highlighting. Off renders each caption as plain
 	// text. It also decides whether transcription bothers requesting word-level
-	// timings at all — but it is applied at render time too, so toggling it
+	// timings at all, but it is applied at render time too, so toggling it
 	// after a transcript exists takes effect immediately instead of forcing a
 	// re-transcribe.
 	wordHighlight: boolean;

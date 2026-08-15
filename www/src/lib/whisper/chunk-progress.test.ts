@@ -36,7 +36,7 @@ describe('WindowProgressTracker', () => {
 
 		// window 1 begins (local time resets); its raw global position
 		// (20 + 2 = 22) is *behind* window 0's last reported position (29)
-		// because windows overlap — the tracker must not report a smaller
+		// because windows overlap, the tracker must not report a smaller
 		// fraction than it already reported.
 		const afterReset = tracker.observe(2);
 		expect(afterReset).toBeGreaterThanOrEqual(beforeReset);

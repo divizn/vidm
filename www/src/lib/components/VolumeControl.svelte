@@ -14,7 +14,7 @@
 	const MAX_PERCENT = MAX_VOLUME * 100;
 
 	// UI works in whole percent (0-200); filters.ts/buildExportArgs work in
-	// the 0-2 multiplier the volume filter itself expects — convert at the
+	// the 0-2 multiplier the volume filter itself expects, convert at the
 	// boundary rather than carrying two representations through the app.
 	const volumePercent = $derived(Math.round(volume * 100));
 

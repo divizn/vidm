@@ -23,7 +23,7 @@ for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm', 'ffmpeg-core.worker.js
 // core-mt's exec()/ffprobe() wrappers swallow non-"Aborted()" native
 // exceptions by re-throwing them, but they check that via
 // `e.message.startsWith("Aborted")` with no guard for `e.message` being
-// undefined — which it is for some exceptions the wasm module throws
+// undefined, which it is for some exceptions the wasm module throws
 // (e.g. plain exit-status objects). That turns a real ffmpeg failure into
 // an opaque "can't access property 'startsWith', e.message is undefined"
 // TypeError, hiding what actually went wrong. Patch the copied file (the
@@ -37,7 +37,7 @@ const patched = original.replaceAll(
 );
 if (patched === original) {
 	console.warn(
-		'[copy-ffmpeg-core] expected e.message.startsWith("Aborted") guard not found — @ffmpeg/core-mt may have changed, check whether this patch is still needed'
+		'[copy-ffmpeg-core] expected e.message.startsWith("Aborted") guard not found, @ffmpeg/core-mt may have changed, check whether this patch is still needed'
 	);
 } else {
 	writeFileSync(ffmpegCoreJsPath, patched);

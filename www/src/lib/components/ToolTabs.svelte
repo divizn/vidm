@@ -6,7 +6,7 @@
 		label: string;
 		icon: LucideIcon;
 		enabled: boolean;
-		// Set to lock the tab out entirely (unclickable, dimmed) — distinct
+		// Set to lock the tab out entirely (unclickable, dimmed), distinct
 		// from `enabled` above, which just marks whether the tool already
 		// has a real selection. The string is shown as the tab's tooltip in
 		// place of its label, explaining why it's locked.

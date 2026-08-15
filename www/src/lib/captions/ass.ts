@@ -36,7 +36,7 @@ function dialogueLine(start: number, end: number, text: string): string {
 }
 
 // Segment/word timestamps are on the transcript's original timeline, but
-// `setpts=PTS/speed` retimes the video's own timeline by the same factor —
+// `setpts=PTS/speed` retimes the video's own timeline by the same factor:
 // dividing here keeps burned-in captions aligned with the sped-up/slowed
 // video instead of drifting by exactly the speed factor.
 function toOutputTime(seconds: number, speed: number): number {
@@ -45,7 +45,7 @@ function toOutputTime(seconds: number, speed: number): number {
 
 // Word timing is independent of segment timing (different source: token
 // offsets vs. segment offsets), so it can drift slightly outside the
-// segment's own bounds — clamp to the segment and drop anything that
+// segment's own bounds: clamp to the segment and drop anything that
 // collapses to zero (or negative) duration once clamped. Shared by both
 // the ASS burn-in export and the live preview overlay so they agree on
 // which word is "active" at a given time.
@@ -58,7 +58,7 @@ function clampWordsToSegment(seg: CaptionSegment, segStart: number, segEnd: numb
 
 // Word-level highlight: one dialogue event per word, spanning from that
 // word's own start to the next word's start (or segment end for the last
-// word) — this keeps the caption continuously visible for the whole
+// word), this keeps the caption continuously visible for the whole
 // segment while the "active" word progressively updates, rather than only
 // lighting up for the word's own (often very short) duration.
 function buildSegmentDialogues(
@@ -110,7 +110,7 @@ export interface ActiveCaptionWord {
 
 // Live-preview counterpart to buildAssSubtitle: given the current playback
 // time, resolves which words (if any) should be showing and which one (if
-// any) is "active" — using the exact same windowing as the ASS export
+// any) is "active", using the exact same windowing as the ASS export
 // (clampWordsToSegment + "active until the next word starts") so the
 // preview and the actual burn-in never disagree. Returns null when no
 // segment covers `time` (nothing shows, matching the real burn-in).
@@ -141,7 +141,7 @@ export function getActiveCaption(segments: CaptionSegment[], time: number): Acti
 
 // Advances the illustrative caption-style preview's synthetic clock by
 // deltaSeconds, wrapping back to the first segment's start (not 0) once
-// past the last segment's end — avoids the loop sitting on a dead silent
+// past the last segment's end, avoids the loop sitting on a dead silent
 // gap if there's lead-in before captions begin. Used by CaptionPreview's
 // auto-cycling demo, which has no real video/audio driving a `timeupdate`.
 export function advancePreviewTime(
@@ -159,7 +159,7 @@ export function advancePreviewTime(
 // Builds a full .ass subtitle document for burn-in via FFmpeg's `ass`
 // filter. width/height must match the output frame size exactly (PlayResX/
 // PlayResY) so libass doesn't apply its own auto-scaling on top of ours.
-// `speed` must match the export's playback-speed setting — the `ass` filter
+// `speed` must match the export's playback-speed setting: the `ass` filter
 // burns in against the video's already-retimed (`setpts=PTS/speed`) PTS, so
 // dialogue timestamps built from the original transcript need the same
 // scaling or they drift out of sync with the sped-up/slowed video.
