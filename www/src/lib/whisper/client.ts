@@ -13,13 +13,13 @@ const cpuLog = createEngineLog('whisper-cpu');
 // (`shout.wasm_no-simd.js`) shares that exact same hardcoded worker
 // bootstrap line pointing at "shout.wasm.js" regardless of which variant is
 // running, so pairing it as the main-thread module mismatches it against a
-// SIMD-compiled pthread worker — that mismatch, not the environment, was
+// SIMD-compiled pthread worker: that mismatch, not the environment, was
 // the source of the crash this file used to work around with diagnostics.
 const SHOUT_URL = '/whisper/shout.wasm.js';
 const MODEL_URL = '/whisper/ggml-tiny.en-q5_1.bin';
 
 // Fixed window each chunk is transcribed in, instead of one pass over the
-// whole file — bounds whisper.cpp's per-call wasm heap growth on long
+// whole file, bounds whisper.cpp's per-call wasm heap growth on long
 // videos and turns progress into per-chunk granularity instead of one
 // opaque whole-file percentage.
 export const TRANSCRIBE_CHUNK_SECONDS = 30;

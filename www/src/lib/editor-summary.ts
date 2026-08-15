@@ -49,23 +49,23 @@ export type ToolId =
 export interface ToolState {
 	id: ToolId;
 	label: string;
-	// Whether this tool has a real, non-default selection — the same signal
+	// Whether this tool has a real, non-default selection, the same signal
 	// used everywhere a tool's "is it doing anything" state is needed
 	// (export gating, tab dots, the export summary). There's no separate
 	// "enabled" flag independent of this.
 	active: boolean;
-	// Only meaningful when active — the export-summary fragment for this
+	// Only meaningful when active: the export-summary fragment for this
 	// tool (e.g. "Trim 0:01.0–0:09.0", "150% volume").
 	summaryText?: string;
 }
 
 // Single source of truth for "which tools are doing something and what do
-// they say about it" — every other per-tool list in the editor page
+// they say about it": every other per-tool list in the editor page
 // (hasActiveTransform, each tab's enabled dot, the export summary line, the
 // "select at least one option" guard message) derives from this one array
 // instead of separately re-deriving the same active/inactive condition.
 // Adding a new tool means adding one entry here (plus an icon mapping and a
-// panel in +page.svelte, which are unavoidably UI-specific) — not hunting
+// panel in +page.svelte, which are unavoidably UI-specific), not hunting
 // down every place that used to need a matching hand-edit.
 export function buildToolStates(input: EditorSummaryInput): ToolState[] {
 	const trimActive = input.trimStart > 0 || input.trimEnd < input.sourceDuration;
@@ -141,7 +141,7 @@ export function buildExportSummary(input: EditorSummaryInput): string[] {
 		.map((tool) => tool.summaryText!);
 }
 
-// The guard message shown when no tool has a real selection yet — lists
+// The guard message shown when no tool has a real selection yet: lists
 // every tool by name so it can never go stale relative to buildToolStates
 // (previously a hand-written sentence that twice fell out of sync when a
 // new tool, Trim then Volume, was added without updating it).

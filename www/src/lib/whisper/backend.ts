@@ -12,7 +12,7 @@ const GPU_TRANSCRIPTION_ENABLED = false;
 export type BackendReason =
 	| 'webgpu-ok'
 	| 'gpu-disabled'
-	// Also what you get over plain http:// on a LAN address — not a secure context.
+	// Also what you get over plain http:// on a LAN address, not a secure context.
 	| 'no-webgpu-api'
 	// Almost always browser hardware acceleration being off: the one fixable case.
 	| 'no-adapter'

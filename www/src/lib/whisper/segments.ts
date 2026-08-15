@@ -2,7 +2,7 @@ import { formatSrtTimestamp, type CaptionSegment, type CaptionWord } from './srt
 
 // transformers.js returns a flat list of word chunks when asked for
 // `return_timestamps: 'word'`, but the app's data model (and the ASS burn-in)
-// is segment-level with nested word timings — so the flat list is regrouped
+// is segment-level with nested word timings, so the flat list is regrouped
 // here. The whisper.cpp backend gets segmentation for free from whisper's own
 // output; this is the GPU path's equivalent.
 export interface WordChunk {

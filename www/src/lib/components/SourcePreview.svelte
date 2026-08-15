@@ -67,14 +67,14 @@
 		renderedWidth = videoEl.clientWidth;
 		renderedHeight = videoEl.clientHeight;
 		// Some browsers (notably Firefox) never paint a frame for a paused,
-		// non-autoplaying <video> until something actually requests one — a
+		// non-autoplaying <video> until something actually requests one, a
 		// negligible forced seek triggers the decode+paint without visibly
 		// scrubbing, so the preview shows real content instead of black.
 		videoEl.currentTime = 0.001;
 	}
 
 	// Largest box with the target ratio that fits inside the source frame,
-	// as a fraction of the source's own width/height — the boxScale=1
+	// as a fraction of the source's own width/height: the boxScale=1
 	// reference size that resizing scales down from.
 	const boxFrac = $derived.by(() => {
 		if (!sourceWidth || !sourceHeight) return { w: 1, h: 1 };
@@ -85,11 +85,11 @@
 			: { w: 1, h: sourceRatio / targetRatio };
 	});
 
-	// The box's actual on-screen size, after applying the resize scale —
+	// The box's actual on-screen size, after applying the resize scale,
 	// still exactly ratio-locked, since both axes scale by the same factor.
 	const boxSizeFrac = $derived({ w: boxFrac.w * boxScale, h: boxFrac.h * boxScale });
 
-	// libx264 requires even width/height (yuv420p chroma subsampling) —
+	// libx264 requires even width/height (yuv420p chroma subsampling):
 	// round down to the nearest even number, never up, so the crop region
 	// never exceeds the source frame.
 	function toEven(n: number): number {
@@ -112,8 +112,8 @@
 
 	// Jumps the preview to the trim start when the Trim tab becomes active,
 	// and again whenever the user drags the start handle while it's active
-	// — trimEnd changing doesn't need its own seek, the loop-back in
-	// onTimeUpdate below handles that once playback reaches it.
+	// (trimEnd changing doesn't need its own seek, the loop-back in
+	// onTimeUpdate below handles that once playback reaches it).
 	$effect(() => {
 		if (!videoEl || !clampToTrim) return;
 		videoEl.currentTime = trimStart;
@@ -121,7 +121,7 @@
 
 	// Mirrors the Speed tool's value onto the preview element itself, so
 	// scrubbing/playing the source preview approximates the exported
-	// pacing — the export's own audio pitch-correction (atempo) isn't
+	// pacing: the export's own audio pitch-correction (atempo) isn't
 	// replicated here, this is just the native playbackRate the browser
 	// already knows how to apply.
 	$effect(() => {
@@ -131,7 +131,7 @@
 
 	// Mirrors the Volume tool's value onto the preview element, same pattern
 	// as the playbackRate mirror above. HTMLMediaElement.volume caps at 1.0
-	// in the browser — values above 1 (a boosted export) clamp to the
+	// in the browser: values above 1 (a boosted export) clamp to the
 	// loudest the native element can actually play; see VolumeControl's own
 	// note about this limitation.
 	$effect(() => {
@@ -148,7 +148,7 @@
 	}
 
 	// Live readout of the actual export resolution this crop region will
-	// produce — reuses the same computeOutputDimensions call +page.svelte
+	// produce: reuses the same computeOutputDimensions call +page.svelte
 	// makes for the real export, so what's shown here never drifts from
 	// what actually gets encoded.
 	const outputSize = $derived(
@@ -186,7 +186,7 @@
 
 	// Resize via the bottom-right handle, anchored at the box's current
 	// top-left corner (that corner stays put; only the opposite corner
-	// moves) — horizontal drag distance alone drives the scale, since the
+	// moves): horizontal drag distance alone drives the scale, since the
 	// ratio lock means the vertical size is already implied by it.
 	let resizing = false;
 	let resizeStartX = 0;
@@ -229,7 +229,7 @@
 		return Math.min(1, Math.max(0, n));
 	}
 
-	// Custom play/pause overlay replaces the native <video controls> bar —
+	// Custom play/pause overlay replaces the native <video controls> bar:
 	// this app only needs start/stop, not a scrubber or volume UI (volume
 	// has its own dedicated tool tab; scrubbing precision comes from the
 	// trim handles/mm:ss inputs instead).
@@ -241,7 +241,7 @@
 		else videoEl.pause();
 	}
 
-	// Trim handles, dragged directly on the video frame — mirrors the crop
+	// Trim handles, dragged directly on the video frame: mirrors the crop
 	// box's own onPointerDown/Move/Up + setPointerCapture pattern above, so
 	// dragging tracks the pointer even once it leaves the thin handle.
 	let trimStripEl: HTMLDivElement | undefined = $state();

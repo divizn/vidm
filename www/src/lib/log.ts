@@ -20,7 +20,7 @@ export function verboseEnabled(): boolean {
 			return true;
 		}
 	} catch {
-		// Ignore — absence of a parseable location just means "not verbose".
+		// Ignore: absence of a parseable location just means "not verbose".
 	}
 	return false;
 }

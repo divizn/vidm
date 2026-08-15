@@ -80,7 +80,7 @@ describe('explainBackend', () => {
 		const messages = reasons.map((reason) =>
 			explainBackend({ backend: reason === 'webgpu-ok' ? 'webgpu' : 'wasm', reason })
 		);
-		// Every reason must produce its own message — a shared string would put us
+		// Every reason must produce its own message: a shared string would put us
 		// back where we started, unable to tell causes apart from a bug report.
 		expect(new Set(messages).size).toBe(reasons.length);
 		expect(messages.every((message) => message.length > 0)).toBe(true);

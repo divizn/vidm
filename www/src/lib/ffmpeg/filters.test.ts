@@ -31,7 +31,7 @@ describe('outputDimensions', () => {
 
 	it('always returns even dimensions', () => {
 		// Regression: odd pixel dimensions silently crash libx264 (needs even
-		// width/height for yuv420p) — ffmpeg.wasm wrote an empty file instead
+		// width/height for yuv420p), ffmpeg.wasm wrote an empty file instead
 		// of throwing, and the app treated that as a successful 0-byte export.
 		for (const longEdge of [641, 999, 1281, 1920]) {
 			for (const ratio of ASPECT_RATIOS) {
@@ -256,7 +256,7 @@ describe('buildExportArgs', () => {
 
 	// Regression: a lone encoder was assumed to fit the pthread pool without
 	// a cap, but crop + CRF compression died at libx264 init with an
-	// Emscripten `unwind` throw — every re-encode gets capped now.
+	// Emscripten `unwind` throw, every re-encode gets capped now.
 	it('caps encoder threads for a plain crop at 1x with no extra pipeline', () => {
 		const args = buildExportArgs('in.mp4', 'out.mp4', baseOptions());
 
@@ -266,7 +266,7 @@ describe('buildExportArgs', () => {
 
 	// Regression: this combo (no blur-pad, no audio re-encode) left the
 	// encoder uncapped and died at libx264 init with an Emscripten `unwind`
-	// throw — libass counts as a concurrent pipeline too.
+	// throw, libass counts as a concurrent pipeline too.
 	it('caps encoder threads when burning in captions', () => {
 		const args = buildExportArgs(
 			'in.mp4',
@@ -333,7 +333,7 @@ describe('buildExportArgs', () => {
 		});
 
 		it('forces a real video+audio re-encode when trim alone is active, never -c:v/-c:a copy', () => {
-			// A copy-mode trim (-ss/-t + -c:v copy) can only cut at keyframes —
+			// A copy-mode trim (-ss/-t + -c:v copy) can only cut at keyframes:
 			// if trimStart doesn't land on one, the output can start mid-GOP
 			// without its reference frame: an invalid/undecodable stream, not
 			// just an imprecise cut. Trim must force the same re-encode path
@@ -378,7 +378,7 @@ describe('buildExportArgs', () => {
 			expect(args[args.indexOf('-preset') + 1]).toBe('veryfast');
 		});
 
-		it('never sets a preset on the -c:v copy fast path — there is no encoder to configure', () => {
+		it('never sets a preset on the -c:v copy fast path: there is no encoder to configure', () => {
 			const args = buildExportArgs(
 				'in.mp4',
 				'out.mp4',
@@ -387,7 +387,7 @@ describe('buildExportArgs', () => {
 			expect(args).not.toContain('-preset');
 		});
 
-		it('never caps threads on the -c:v copy fast path — no encoder threads to cap', () => {
+		it('never caps threads on the -c:v copy fast path: no encoder threads to cap', () => {
 			const args = buildExportArgs(
 				'in.mp4',
 				'out.mp4',

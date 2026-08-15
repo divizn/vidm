@@ -1,4 +1,4 @@
-// Assumes constant throughput — rough enough for an "about Xs left" label.
+// Assumes constant throughput, rough enough for an "about Xs left" label.
 export function estimateRemainingSeconds(startedAt: number, progressPercent: number): number | null {
 	if (progressPercent <= 0) return null;
 	const elapsedMs = Date.now() - startedAt;

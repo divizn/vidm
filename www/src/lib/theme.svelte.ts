@@ -12,7 +12,7 @@ function apply(theme: Theme) {
 	document.documentElement.classList.toggle('dark', theme === 'dark');
 }
 
-// SSR is disabled app-wide, so this only ever runs in the browser — no
+// SSR is disabled app-wide, so this only ever runs in the browser, no
 // window/document guards needed at the call site.
 export const themeState = $state<{ current: Theme }>({
 	current: (localStorage.getItem(STORAGE_KEY) as Theme | null) ?? (systemPrefersDark() ? 'dark' : 'light')
@@ -43,7 +43,7 @@ export async function setColorTheme(theme: ColorTheme) {
 	}
 }
 
-// Async, unlike apply() above — a returning visitor with a persisted
+// Async, unlike apply() above: a returning visitor with a persisted
 // non-warm theme sees a brief flash of the warm (default) palette until
 // this dynamic import resolves. Accepted tradeoff: avoiding it would mean
 // a render-blocking inline script in app.html, not worth it for a cosmetic

@@ -4,7 +4,7 @@
 
 	// VLC-style wedge/cone volume slider: the track is clipped into a wedge
 	// (thin at the quiet end, thick at the loud end), with a thin vertical
-	// notch as the thumb instead of a round handle — visually distinct from
+	// notch as the thumb instead of a round handle, visually distinct from
 	// the generic bar Slider used elsewhere, but built on the same bits-ui
 	// primitive for drag/keyboard/touch handling.
 	let {
@@ -14,14 +14,14 @@
 		...restProps
 	}: WithoutChildrenOrChild<SliderPrimitive.RootProps> = $props();
 
-	// Deeper wedge than the first pass — thinner at the quiet end (0%), much
+	// Deeper wedge than the first pass: thinner at the quiet end (0%), much
 	// thicker at the loud end (100%), for a more dramatic/visible cone shape
 	// now that the track has more height (h-12) to work with.
 	//
 	// Point order matters here: traced as top-left, top-right, bottom-right,
 	// bottom-left. A previous version had the left-edge pair backwards
 	// (bottom-left's y was smaller than top-left's), which made the polygon
-	// self-intersect for roughly the first 15% of the width — the shape
+	// self-intersect for roughly the first 15% of the width: the shape
 	// visibly pinched to a twisted sliver before un-twisting and widening,
 	// instead of growing monotonically from a clean point at 0%.
 	const WEDGE_CLIP =
@@ -53,7 +53,7 @@
 		{#each thumbItems as thumb (thumb.index)}
 			<!--
 			bits-ui positions Thumb with an inline `position: absolute` style,
-			which overrides any `relative`/`self-stretch` classes here — align-self
+			which overrides any `relative`/`self-stretch` classes here: align-self
 			has no effect on an absolutely positioned element with ambiguous
 			top/bottom, so the thumb rendered at 0 height instead of stretching
 			to the track. Explicit `top-0 bottom-0` insets (relative to the

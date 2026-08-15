@@ -11,7 +11,7 @@
 	const SPEED_STEP = 0.05;
 
 	// Rounds to the nearest step so repeated 0.05 increments never drift
-	// into floating-point noise (e.g. 1.2999999999999998) — done once
+	// into floating-point noise (e.g. 1.2999999999999998), done once
 	// here, at the point speed is set, rather than reformatting it at
 	// every display site.
 	function onSpeedChange(value: number) {

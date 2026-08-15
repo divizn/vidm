@@ -5,7 +5,7 @@
 // node_modules/@huggingface/transformers/src/pipelines/automatic-speech-recognition.js):
 // each window covers `chunkLengthS` seconds, and each subsequent window
 // starts `jump = chunkLengthS - 2*strideLengthS` seconds after the previous
-// one's start — windows overlap by `strideLengthS` on each side so the
+// one's start: windows overlap by `strideLengthS` on each side so the
 // pipeline can merge text across a hard cut instead of mangling it.
 //
 // WhisperTextStreamer's on_chunk_start/on_chunk_end callbacks (see
@@ -35,7 +35,7 @@ export function countWindows(durationSeconds: number, chunkLengthS: number, stri
 
 // Because windows overlap, the next window's local time-since-0 restarts
 // *before* the previous window's last reported global position (they share
-// `strideLengthS` seconds of audio on each side) — a naive
+// `strideLengthS` seconds of audio on each side), a naive
 // windowIndex*jump + localTime computation would occasionally report a
 // smaller fraction than it just reported a moment ago. A progress bar that
 // visibly rewinds reads as more broken than one that briefly plateaus, so

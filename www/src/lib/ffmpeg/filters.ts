@@ -15,7 +15,7 @@ export const ASPECT_RATIOS: AspectRatio[] = [
 
 const MAX_OUTPUT_LONG_EDGE = 1920;
 
-// libx264 requires even width/height (yuv420p chroma subsampling) — round
+// libx264 requires even width/height (yuv420p chroma subsampling): round
 // down, never up, so dimensions never exceed their source/cap.
 function toEven(n: number): number {
 	return Math.floor(n / 2) * 2;
@@ -23,7 +23,7 @@ function toEven(n: number): number {
 
 // Output resolution: long edge is whatever the source actually has (capped
 // at MAX_OUTPUT_LONG_EDGE for very high-res sources), never upscaled beyond
-// it — sourceLongEdge should be the crop region's own size for crop mode,
+// it: sourceLongEdge should be the crop region's own size for crop mode,
 // or the source frame's long edge for blur-pad (which keeps the whole
 // frame). Short edge is derived from the target ratio.
 export function outputDimensions(
@@ -35,7 +35,7 @@ export function outputDimensions(
 	return ratio.w <= ratio.h ? { width: short, height: longEdge } : { width: longEdge, height: short };
 }
 
-// A region of the source frame, in source pixels — what crop mode keeps.
+// A region of the source frame, in source pixels: what crop mode keeps.
 export interface CropRegion {
 	x: number;
 	y: number;
@@ -43,14 +43,14 @@ export interface CropRegion {
 	height: number;
 }
 
-// atempo only accepts 0.5-2.0 in a single filter instance — speeds above
+// atempo only accepts 0.5-2.0 in a single filter instance: speeds above
 // 2x chain two atempo filters (see buildAtempoChain) to reach MAX_SPEED
 // without exceeding that per-filter limit.
 export const MIN_SPEED = 0.5;
 export const MAX_SPEED = 4;
 
 // Gain multiplier for ffmpeg's `volume` audio filter. 1 = unchanged
-// (default, inactive — same "no separate enabled flag" convention as
+// (default, inactive, same "no separate enabled flag" convention as
 // every other tool). 0 = silent. HTMLMediaElement.volume caps at 1.0 in
 // the browser, so the in-editor preview (SourcePreview) can only mirror
 // 0-1 accurately; boosting above 1 is export-only, see its own comment.
@@ -59,7 +59,7 @@ export const MAX_VOLUME = 2;
 export const DEFAULT_VOLUME = 1;
 
 // A trim range narrower than this would produce a degenerate (near-zero
-// length) clip — enforced at the UI layer (TrimControl), referenced here
+// length) clip: enforced at the UI layer (TrimControl), referenced here
 // so the export/UI code share one source of truth.
 export const MIN_TRIM_DURATION_SECONDS = 0.5;
 
@@ -139,15 +139,15 @@ export const GIF_QUALITY_PRESETS: GifQualityPreset[] = [
 export const DEFAULT_GIF_QUALITY: GifQualityPreset = GIF_QUALITY_PRESETS[1];
 
 // Fixed audio bitrate whenever audio gets re-encoded (needed so 'size' mode
-// can budget for it) — see needsAudioReencode below.
+// can budget for it), see needsAudioReencode below.
 const AUDIO_BITRATE_KBPS = 128;
 
-// libx264 defaults to "medium" when -preset is unset — tuned for
+// libx264 defaults to "medium" when -preset is unset, tuned for
 // compression efficiency, not speed, and it's genuinely slow for a
 // CPU-only WASM encoder (there's no GPU acceleration available to ffmpeg
 // in-browser at all, WASM has no path to hardware encoding). "veryfast"
 // cuts encode time substantially at the cost of a marginally larger file
-// for the same CRF — same visual quality, just slightly less efficient
+// for the same CRF: same visual quality, just slightly less efficient
 // compression. Applied whenever the video is actually being re-encoded;
 // meaningless (and not applied) on the -c:v copy fast path, since no
 // encoder runs there at all.
@@ -164,9 +164,9 @@ const X264_PRESET = 'veryfast';
 // So every re-encode gets a cap, not just the ones with a second
 // concurrent pipeline. This was originally conditional on `extraPipelines`
 // (blur-pad's dual video streams, an audio encoder, libass) on the theory
-// that a lone encoder always fits — confirmed wrong in practice: crop +
+// that a lone encoder always fits (confirmed wrong in practice: crop +
 // CRF compression with no other pipeline still died at libx264 init with
-// `unwind`. Extra pipelines still tighten the cap further, since they need
+// `unwind`). Extra pipelines still tighten the cap further, since they need
 // their own workers out of the same pool.
 const THREADS_FOR_NO_EXTRA_PIPELINE = 4;
 const THREADS_FOR_SINGLE_EXTRA_PIPELINE = 4;
@@ -181,18 +181,18 @@ export interface ExportOptions {
 	compression: CompressionSettings;
 	sourceDurationSeconds: number;
 	// Trim range in seconds, into the source file's own timeline. Equal to
-	// [0, sourceDurationSeconds] when trim is inactive — callers must
+	// [0, sourceDurationSeconds] when trim is inactive: callers must
 	// default it that way so this module can tell "no trim" apart from "a
 	// deliberately narrow range" without a separate enabled flag.
 	trimStart: number;
 	trimEnd: number;
-	// Source frame dimensions — used so blur-pad (which keeps the whole
+	// Source frame dimensions: used so blur-pad (which keeps the whole
 	// frame) doesn't upscale beyond what the source actually has.
 	sourceWidth: number;
 	sourceHeight: number;
 	// Path (in ffmpeg's FS) to a pre-built .ass subtitle file to burn in via
 	// the `ass` filter, alongside a `fontsdir` directory holding the font(s)
-	// it references — building that file is the caller's job (see
+	// it references, building that file is the caller's job (see
 	// $lib/captions/ass.ts), buildExportArgs only wires the filter in.
 	captionsAssPath?: string;
 	captionsFontsDir?: string;
@@ -201,7 +201,7 @@ export interface ExportOptions {
 	gifQuality: GifQualityPreset;
 }
 
-// The final output frame size for a given mode/ratio/crop/source — exposed
+// The final output frame size for a given mode/ratio/crop/source, exposed
 // separately from buildExportArgs so callers that need it ahead of export
 // (e.g. sizing a caption burn-in's ASS PlayResX/PlayResY to match exactly)
 // don't have to duplicate this logic.
@@ -209,7 +209,7 @@ export function computeOutputDimensions(
 	options: Pick<ExportOptions, 'mode' | 'ratio' | 'crop' | 'sourceWidth' | 'sourceHeight'>
 ): { width: number; height: number } {
 	const { mode, ratio, crop, sourceWidth, sourceHeight } = options;
-	// 'none': no reformat at all — keep the source's own frame size
+	// 'none': no reformat at all, keep the source's own frame size
 	// (rounded to even, needed only if some other option still forces a
 	// re-encode; see buildExportArgs). No ratio/crop-driven resizing.
 	if (mode === 'none') {
@@ -247,7 +247,7 @@ export function buildExportArgs(
 	} = options;
 
 	// Applied as *input* options (before -i), using -t (duration) rather
-	// than -to (absolute end) — -to as an input option is relative to the
+	// than -to (absolute end): -to as an input option is relative to the
 	// file's own start, not to -ss, which would double-trim the tail.
 	const trimIsActive = trimStart > 0 || trimEnd < sourceDurationSeconds;
 	const trimArgs = trimIsActive ? ['-ss', String(trimStart), '-t', String(trimEnd - trimStart)] : [];
@@ -255,9 +255,9 @@ export function buildExportArgs(
 	const needsSpeedFilters = speed !== 1;
 	const needsVolumeFilter = volume !== 1;
 	// 'size' mode needs audio re-encoded too (fixed bitrate) so the file-size
-	// budget it computes for video is actually accurate — a copied audio
+	// budget it computes for video is actually accurate, a copied audio
 	// track's real bitrate isn't known ahead of time. An active trim also
-	// forces re-encode (video below, audio here) — a copy-mode trim can
+	// forces re-encode (video below, audio here): a copy-mode trim can
 	// only cut at keyframes, so a trimStart that doesn't land on one can
 	// produce an invalid/undecodable output stream, not just an imprecise
 	// cut (same reasoning CaptionsPanel's own trim extraction already
@@ -270,7 +270,7 @@ export function buildExportArgs(
 	// crop + CRF + captions (no blur-pad, no audio re-encode) left the
 	// encoder uncapped at libx264's auto-detected 8 threads
 	// (`threads=6 lookahead_threads=2`) and died immediately after encoder
-	// init with Emscripten's `unwind` throw — the main thread trying to
+	// init with Emscripten's `unwind` throw, the main thread trying to
 	// spawn a pthread the worker pool couldn't satisfy.
 	// palettegen/paletteuse (GIF quality) run their own filter-graph work
 	// too, same reasoning as libass above.
@@ -307,13 +307,13 @@ export function buildExportArgs(
 
 	const speedSuffix = needsSpeedFilters ? `,setpts=PTS/${speed}` : '';
 
-	// Only the 'none' mode's -c:v copy fast path skips video re-encoding —
+	// Only the 'none' mode's -c:v copy fast path skips video re-encoding:
 	// crop and blur-pad always build a -vf/-filter_complex.
 	let videoIsReencoded = true;
 
 	if (mode === 'crop') {
 		// User-positioned crop region (already sized to the target ratio),
-		// scaled only if it exceeds the output cap — never upscaled.
+		// scaled only if it exceeds the output cap, never upscaled.
 		args.push(
 			'-vf',
 			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}${captionsSuffix}${gifSuffix}`
@@ -321,7 +321,7 @@ export function buildExportArgs(
 	} else if (mode === 'blur-pad') {
 		// -threads only caps the encoder; -filter_complex's own thread pool
 		// (scale/boxblur/overlay each may spawn workers) is separate and can
-		// exhaust the shared WASM pthread pool on its own — cap both.
+		// exhaust the shared WASM pthread pool on its own: cap both.
 		args.push(
 			'-filter_complex_threads',
 			'1',
@@ -333,7 +333,7 @@ export function buildExportArgs(
 		// GIF has no audio stream at all: nothing to map.
 		if (outputFormat !== 'gif') args.push('-map', '0:a');
 	} else {
-		// 'none': keep the source frame as-is — no crop/pad/target-ratio
+		// 'none': keep the source frame as-is, no crop/pad/target-ratio
 		// scale. Other options (speed/captions/compression/trim) still apply
 		// and still force a re-encode when active; when none of them are
 		// active either, skip -vf entirely and copy the video stream
@@ -349,7 +349,7 @@ export function buildExportArgs(
 			trimIsActive ||
 			outputFormat !== 'mp4'
 		) {
-			// Even-dimension safety net for the (rare) odd-dimensioned source —
+			// Even-dimension safety net for the (rare) odd-dimensioned source:
 			// libx264/yuv420p requires even width/height. No-op scale otherwise.
 			filters.push(`scale=${outW}:${outH}`, 'setsar=1');
 		}
@@ -388,7 +388,7 @@ export function buildExportArgs(
 	if (outputFormat !== 'gif') {
 		if (compression.mode === 'size') {
 			// Single-pass average-bitrate approximation, not two-pass: two-pass
-			// means a second encode pass over the same video — another
+			// means a second encode pass over the same video, another
 			// concurrent pipeline, and another way to hit the deadlock above.
 			// Output will land close to the target, not exact.
 			const outputDurationSec = (trimEnd - trimStart) / speed;
@@ -410,7 +410,7 @@ export function buildExportArgs(
 		// conflicts with -crf/-b:v.
 	}
 
-	// Only meaningful when an encoder actually runs — the -c:v copy fast
+	// Only meaningful when an encoder actually runs: the -c:v copy fast
 	// path spawns no encoder threads to cap.
 	if (videoIsReencoded) {
 		const threadCap =

@@ -1,5 +1,5 @@
 // Self-hosts the transformers.js Whisper model and the onnxruntime-web WebGPU
-// runtime — no CDN dependency, matching the ffmpeg-core and whisper.cpp
+// runtime, no CDN dependency, matching the ffmpeg-core and whisper.cpp
 // self-hosting pattern in the sibling scripts.
 //
 // The model MUST be the `_timestamped` export: the plain
@@ -20,7 +20,7 @@ import path from 'node:path';
 import https from 'node:https';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-// The local directory name deliberately does not mirror MODEL_ID — the
+// The local directory name deliberately does not mirror MODEL_ID: the
 // upstream HF repo naming shouldn't leak into our tree. The `_timestamped`
 // suffix on MODEL_ID is required, not cosmetic: the plain
 // onnx-community/whisper-base.en export has no `cross_attentions.*` graph
@@ -30,7 +30,7 @@ const root = path.dirname(fileURLToPath(import.meta.url));
 // either. `base` is the default; `tiny` is roughly 2-3x less compute for users
 // who would rather have the transcript sooner than more accurate.
 //
-// Revisions are pinned to commit SHAs, not 'main' — 'main' is a moving target,
+// Revisions are pinned to commit SHAs, not 'main': 'main' is a moving target,
 // so an upstream re-export would silently change the downloaded bytes with no
 // edit to this file, which is exactly the signal the CI upload gate (see
 // "Check if large R2 assets changed" in ci.yml) relies on to decide whether to
@@ -42,11 +42,11 @@ const MODELS = [
 		id: 'onnx-community/whisper-base.en_timestamped',
 		revision: 'fa239a41836c3305f6beec180e5940f3823ff5b8',
 		// Local directory names deliberately do not mirror the upstream repo
-		// ids — HF naming shouldn't leak into our tree — but they ARE the model
+		// ids (HF naming shouldn't leak into our tree) but they ARE the model
 		// ids passed to transformers.js, so they must match webgpu-worker.ts.
 		dir: 'whisper-webgpu',
-		// int8, NOT q4f16. A 4-bit decoder produced badly degraded transcripts —
-		// words repeating ten or more times — identically in Chrome and Firefox,
+		// int8, NOT q4f16. A 4-bit decoder produced badly degraded transcripts
+		// (words repeating ten or more times) identically in Chrome and Firefox,
 		// which is the classic symptom of an over-quantized Whisper decoder stuck
 		// in a repetition loop. Browser-independence is what ruled out WebGPU
 		// itself. The CPU path's whisper.cpp model uses the much gentler q5_1 and
@@ -90,11 +90,11 @@ function download(url, dest) {
 		https
 			.get(url, (res) => {
 				if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-					// Drain the redirect body — leaving it unread stalls the socket
+					// Drain the redirect body: leaving it unread stalls the socket
 					// and the install hangs (same bug fixed for the whisper model).
 					// HF's small-file resolver returns 307s with a Location that's
 					// relative (e.g. "/api/resolve-cache/..."), unlike the 302s to
-					// an absolute CDN URL that large LFS/xet files get — resolve
+					// an absolute CDN URL that large LFS/xet files get, resolve
 					// against the current URL so both cases work.
 					res.resume();
 					const next = new URL(res.headers.location, url).toString();
@@ -110,8 +110,8 @@ function download(url, dest) {
 				// place only once the transfer has fully succeeded. A same-dir
 				// rename is atomic; without this, a connection drop, process
 				// kill, or full disk mid-write leaves a truncated file sitting
-				// at `dest` — exactly the path the idempotency check
-				// (existsSync(dest)) tests — so the next run would treat the
+				// at `dest`, exactly the path the idempotency check
+				// (existsSync(dest)) tests, so the next run would treat the
 				// corrupt file as "already present" and never retry it.
 				const tempDest = `${dest}.tmp-${process.pid}`;
 				const cleanupTemp = () => {
@@ -171,7 +171,7 @@ for (const model of MODELS) {
 // onnxruntime-web is declared as a direct dependency purely so pnpm hoists it
 // to node_modules/onnxruntime-web. As a transitive dependency of
 // @huggingface/transformers it would stay in the .pnpm store under a
-// version-stamped directory, and this copy would silently skip — leaving the
+// version-stamped directory, and this copy would silently skip, leaving the
 // runtime to fall back to a CDN, which breaks offline use.
 const ortSrcDir = path.join(root, '..', 'node_modules', 'onnxruntime-web', 'dist');
 if (!existsSync(ortSrcDir)) {
@@ -183,7 +183,7 @@ if (!existsSync(ortSrcDir)) {
 }
 
 // Copy EVERY ort-wasm-simd-threaded.* variant, not a hand-picked subset.
-// onnxruntime ships four builds — plain, .jsep, .jspi and .asyncify — and
+// onnxruntime ships four builds (plain, .jsep, .jspi and .asyncify) and
 // chooses between them at runtime from the browser's capabilities. Copying only
 // .jsep shipped a runtime that worked in Chrome and broke in Firefox, which
 // lacks JSPI and so requests the .asyncify build; the missing file 404'd, the

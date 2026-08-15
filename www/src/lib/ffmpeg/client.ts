@@ -4,11 +4,11 @@ import { createEngineLog } from '$lib/log';
 
 export const ffmpegLog = createEngineLog('ffmpeg');
 
-// Self-hosted, multi-threaded core — needs COOP/COEP (see vite.config.ts).
+// Self-hosted, multi-threaded core, needs COOP/COEP (see vite.config.ts).
 const CORE_BASE_URL = '/ffmpeg';
 
 // A second multi-threaded instance can't initialize while an earlier one is
-// still alive in the same page (its pthread worker pool never spins up) —
+// still alive in the same page (its pthread worker pool never spins up):
 // confirmed not fixable by terminating the old instance first, with or
 // without a grace period. Originally the app only ever called this once
 // (from the main export flow); trim's caption pre-extraction now needs a
@@ -25,7 +25,7 @@ export function loadFFmpeg(): Promise<FFmpeg> {
 
 // Call after any ffmpeg call (writeFile/exec/readFile/...) throws. A WASM
 // abort (e.g. an internal "unwind" exception escaping ffmpeg's native
-// code) leaves the module instance permanently broken — every later call
+// code) leaves the module instance permanently broken: every later call
 // on it keeps failing too, generically, which is what turns a single real
 // failure into "works the first time, then every retry fails" (retrying
 // via loadFFmpeg() would otherwise keep handing back this same dead

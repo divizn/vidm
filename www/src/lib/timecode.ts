@@ -1,5 +1,5 @@
 // Formats a duration in seconds as M:SS.s (e.g. 83.4 -> "1:23.4"), rounded
-// to the nearest tenth of a second — trim only needs sub-second precision
+// to the nearest tenth of a second, trim only needs sub-second precision
 // for defining an edit point, not frame-accurate display.
 export function formatTimecode(totalSeconds: number): string {
 	const clamped = Math.max(0, totalSeconds);

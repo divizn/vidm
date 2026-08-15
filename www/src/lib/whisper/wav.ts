@@ -7,7 +7,7 @@
 // top of bytes that are already in the target format.
 //
 // The `data` chunk is located by walking the chunk list rather than assuming
-// the canonical 44-byte header — ffmpeg writes a LIST/INFO chunk carrying its
+// the canonical 44-byte header: ffmpeg writes a LIST/INFO chunk carrying its
 // encoder tag, so a hardcoded offset would read metadata as audio and desync
 // every timestamp downstream.
 
@@ -17,7 +17,7 @@ const FMT = 0x666d7420;
 const DATA = 0x64617461;
 
 // Whisper's feature extractor expects mono 16kHz, and the transformers.js
-// pipeline does not resample a raw Float32Array — it trusts these to match.
+// pipeline does not resample a raw Float32Array: it trusts these to match.
 const EXPECTED_SAMPLE_RATE = 16000;
 const EXPECTED_CHANNELS = 1;
 

@@ -13,7 +13,7 @@ export { backendLabel, explainBackend, isFixableByUser } from './backend';
 export { TRANSCRIBE_CHUNK_SECONDS } from './client';
 
 // The caller extracts audio in whichever shape the chosen backend needs, so it
-// has to know the backend before extracting — hence pickBackend being separate
+// has to know the backend before extracting, hence pickBackend being separate
 // from transcribe.
 export const pickBackend = detectBackend;
 
@@ -22,7 +22,7 @@ export interface WebGpuInput {
 	// A thunk, not a resolved Float32Array: extraction has to run *inside*
 	// this function's try/catch below, or a failure there (e.g. no audio
 	// track, or a wavToFloat32 rejection) would be an argument-evaluation
-	// crash that never reaches the fallback — evaluated eagerly as a plain
+	// crash that never reaches the fallback: evaluated eagerly as a plain
 	// argument, it would run before transcribe() is even entered.
 	getAudio: () => Promise<Float32Array>;
 	options: WebGpuOptions;
@@ -47,7 +47,7 @@ export async function transcribe(
 			const audio = await input.getAudio();
 			return await transcribeOnWebGpu(audio, input.options, onProgress);
 		} catch (err) {
-			// Deliberately warn, not error: this is a degradation, not a failure —
+			// Deliberately warn, not error: this is a degradation, not a failure,
 			// the user still gets captions. Logged loudly enough to explain why a
 			// run that announced "GPU" ended up taking CPU-path time.
 			console.warn('[vidm:whisper] GPU transcription failed, falling back to CPU:', err);

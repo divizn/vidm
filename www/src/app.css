@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Same self-hosted fonts used for caption burn-in (www/static/fonts/) — the
+/* Same self-hosted fonts used for caption burn-in (www/static/fonts/), the
    family names here must match CAPTION_FONTS' assFamily in
    $lib/captions/style.ts so the live preview and the burned-in ASS output
    render the same typeface. */

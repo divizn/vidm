@@ -17,7 +17,7 @@
 
 	const active = $derived(getActiveCaption(segments, currentTime));
 
-	// Mirrors buildAssSubtitle's MarginV (6% of frame height) — top/bottom
+	// Mirrors buildAssSubtitle's MarginV (6% of frame height), top/bottom
 	// only, "middle" is always vertically centered regardless of margin,
 	// same as the ASS alignment codes it approximates.
 	const positionStyle = $derived(
@@ -29,7 +29,7 @@
 	);
 
 	// Relative to the video frame's own rendered height, same as
-	// buildAssSubtitle sizing off PlayResY — not the viewport, so the
+	// buildAssSubtitle sizing off PlayResY, not the viewport, so the
 	// preview scales correctly regardless of how big the <video> is shown.
 	const fontSizePx = $derived((style.fontSizePercent / 100) * containerHeight);
 </script>
