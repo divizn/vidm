@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
 	ASPECT_RATIOS,
 	DEFAULT_COMPRESSION,
+	DEFAULT_GIF_QUALITY,
+	DEFAULT_OUTPUT_FORMAT,
+	GIF_QUALITY_PRESETS,
 	buildExportArgs,
 	computeOutputDimensions,
 	outputDimensions,
@@ -70,6 +73,8 @@ function baseOptions(overrides: Partial<ExportOptions> = {}): ExportOptions {
 		trimEnd: 10,
 		sourceWidth: 1920,
 		sourceHeight: 1080,
+		outputFormat: DEFAULT_OUTPUT_FORMAT,
+		gifQuality: DEFAULT_GIF_QUALITY,
 		...overrides
 	};
 }
@@ -463,6 +468,79 @@ describe('buildExportArgs', () => {
 			// Same 3MB budget over half the duration -> roughly double the bitrate.
 			expect(trimmedKbps).toBeGreaterThan(fullKbps * 1.8);
 			expect(trimmedKbps).toBeLessThan(fullKbps * 2.2);
+		});
+	});
+
+	describe('outputFormat "gif"', () => {
+		it('drops audio entirely and skips crf/bitrate', () => {
+			const args = buildExportArgs('in.mp4', 'out.gif', baseOptions({ outputFormat: 'gif' }));
+
+			expect(args).toContain('-an');
+			expect(args).not.toContain('-c:a');
+			expect(args).not.toContain('-crf');
+			expect(args).not.toContain('-b:v');
+		});
+
+		it('appends the palettegen/paletteuse chain after the crop filter', () => {
+			const args = buildExportArgs('in.mp4', 'out.gif', baseOptions({ outputFormat: 'gif' }));
+
+			const vf = args[args.indexOf('-vf') + 1];
+			expect(vf).toContain(`crop=${CROP.width}:${CROP.height}:${CROP.x}:${CROP.y}`);
+			expect(vf).toContain(`fps=${DEFAULT_GIF_QUALITY.fps}`);
+			expect(vf).toContain(`scale=${DEFAULT_GIF_QUALITY.maxWidth}:-1`);
+			expect(vf).toContain('palettegen');
+			expect(vf).toContain('paletteuse');
+		});
+
+		it('uses a chosen quality preset\'s fps/width', () => {
+			const preset = GIF_QUALITY_PRESETS.find((p) => p.label === 'Smooth')!;
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.gif',
+				baseOptions({ outputFormat: 'gif', gifQuality: preset })
+			);
+
+			const vf = args[args.indexOf('-vf') + 1];
+			expect(vf).toContain(`fps=${preset.fps}`);
+			expect(vf).toContain(`scale=${preset.maxWidth}:-1`);
+		});
+
+		it('never takes the -c:v copy fast path, even with mode "none" and every other tool off', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.gif',
+				baseOptions({
+					mode: 'none',
+					compression: { mode: 'none', crf: 23, targetMB: 10 },
+					outputFormat: 'gif'
+				})
+			);
+
+			expect(args).not.toContain('copy');
+			expect(args).toContain('-vf');
+		});
+
+		it('omits the audio map in blur-pad mode', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.gif',
+				baseOptions({ mode: 'blur-pad', outputFormat: 'gif' })
+			);
+
+			expect(args).not.toContain('0:a');
+			const fc = args[args.indexOf('-filter_complex') + 1];
+			expect(fc).toContain('paletteuse');
+			expect(fc.endsWith('[outv]')).toBe(true);
+		});
+
+		it('counts the palette filter graph as an extra pipeline for thread capping', () => {
+			const args = buildExportArgs(
+				'in.mp4',
+				'out.gif',
+				baseOptions({ mode: 'none', speed: 1, outputFormat: 'gif' })
+			);
+
+			expect(args[args.indexOf('-threads') + 1]).toBe('4'); // one extra pipeline (gif)
 		});
 	});
 });

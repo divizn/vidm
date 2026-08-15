@@ -10,9 +10,15 @@
 		ASPECT_RATIOS,
 		DEFAULT_COMPRESSION,
 		DEFAULT_VOLUME,
+		DEFAULT_OUTPUT_FORMAT,
+		DEFAULT_GIF_QUALITY,
+		OUTPUT_FORMAT_EXTENSIONS,
+		OUTPUT_FORMAT_MIME,
 		type ReformatMode,
 		type CropRegion,
-		type CompressionSettings
+		type CompressionSettings,
+		type OutputFormat,
+		type GifQualityPreset
 	} from '$lib/ffmpeg/filters';
 	import { buildAssSubtitle } from '$lib/captions/ass';
 	import { buildToolStates, buildMissingOptionsMessage, type ToolId } from '$lib/editor-summary';
@@ -27,6 +33,7 @@
 	import VolumeControl from '$lib/components/VolumeControl.svelte';
 	import CompressionControl from '$lib/components/CompressionControl.svelte';
 	import CaptionsPanel from '$lib/components/CaptionsPanel.svelte';
+	import OutputFormatControl from '$lib/components/OutputFormatControl.svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Card, CardContent } from '$lib/components/ui/card';
 	import ThemeToggle from '$lib/components/ThemeToggle.svelte';
@@ -38,11 +45,13 @@
 	import CaptionsIcon from '@lucide/svelte/icons/captions';
 	import ScissorsIcon from '@lucide/svelte/icons/scissors';
 	import Volume2Icon from '@lucide/svelte/icons/volume-2';
+	import FilmIcon from '@lucide/svelte/icons/film';
 
 	type Status = 'configuring' | 'loading-engine' | 'processing' | 'done' | 'error';
 	type ActiveTool = ToolId;
 
 	const TOOL_ICONS: Record<ToolId, typeof CropIcon> = {
+		format: FilmIcon,
 		trim: ScissorsIcon,
 		reformat: CropIcon,
 		speed: GaugeIcon,
@@ -55,12 +64,19 @@
 	let progress = $state(0);
 	let processingStartedAt = $state(0);
 	let errorMessage = $state('');
+	// Separate from errorMessage above: that's for a failed export (editor
+	// state is still valid, the user can adjust and retry); this is for a
+	// file the browser couldn't even decode as a video in the first place,
+	// which bounces back to the upload screen instead.
+	let sourceLoadError = $state('');
 	const etaSeconds = $derived(estimateRemainingSeconds(processingStartedAt, progress));
 	let mode = $state<ReformatMode>('none');
 	let ratio = $state(ASPECT_RATIOS[0]);
 	let speed = $state(1);
 	let volume = $state(DEFAULT_VOLUME);
 	let compression = $state<CompressionSettings>({ ...DEFAULT_COMPRESSION, mode: 'none' });
+	let outputFormat = $state<OutputFormat>(DEFAULT_OUTPUT_FORMAT);
+	let gifQuality = $state<GifQualityPreset>(DEFAULT_GIF_QUALITY);
 	let sourceFile = $state<File | null>(null);
 	let sourceDuration = $state(0);
 	let sourceWidth = $state(0);
@@ -68,7 +84,7 @@
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
-	let activeTool = $state<ActiveTool>('trim');
+	let activeTool = $state<ActiveTool>('format');
 	// True while CaptionsPanel has a transcription in flight — locks trim
 	// editing for the duration (see CaptionsPanel's own `generating` prop
 	// comment): a mid-transcription trim change would silently desync the
@@ -108,7 +124,9 @@
 			hasCaptionSegments: captionSegments.length > 0,
 			trimStart,
 			trimEnd,
-			sourceDuration
+			sourceDuration,
+			outputFormat,
+			gifQuality
 		})
 	);
 
@@ -128,7 +146,12 @@
 			label: tool.label,
 			icon: TOOL_ICONS[tool.id],
 			enabled: tool.active,
-			disabledReason: tool.id === 'trim' && captionsGenerating ? 'Captions are generating' : undefined
+			disabledReason:
+				tool.id === 'trim' && captionsGenerating
+					? 'Captions are generating'
+					: (tool.id === 'volume' || tool.id === 'compression') && outputFormat === 'gif'
+						? 'Not available for GIF'
+						: undefined
 		}))
 	);
 
@@ -139,9 +162,15 @@
 
 	function handleFile(file: File) {
 		sourceFile = file;
+		sourceLoadError = '';
 		trimStart = 0;
 		trimEnd = 0; // re-derived once metadata loads, via the $effect above
-		activeTool = 'trim';
+		activeTool = 'format';
+	}
+
+	function handleSourceLoadError() {
+		sourceFile = null;
+		sourceLoadError = "That file couldn't be loaded as a video, try a different file.";
 	}
 
 	async function run() {
@@ -160,8 +189,9 @@
 			status = 'processing';
 			processingStartedAt = Date.now();
 
+			const outputExtension = OUTPUT_FORMAT_EXTENSIONS[outputFormat];
 			const inputName = 'input.mp4';
-			const outputName = 'output.mp4';
+			const outputName = `output.${outputExtension}`;
 			await ffmpeg.writeFile(inputName, await fetchFile(sourceFile));
 
 			let captionsAssPath: string | undefined;
@@ -199,15 +229,17 @@
 					sourceWidth,
 					sourceHeight,
 					captionsAssPath,
-					captionsFontsDir
+					captionsFontsDir,
+					outputFormat,
+					gifQuality
 				})
 			);
 			const data = await ffmpeg.readFile(outputName);
 
 			exportResult.url = URL.createObjectURL(
-				new Blob([new Uint8Array(data as Uint8Array)], { type: 'video/mp4' })
+				new Blob([new Uint8Array(data as Uint8Array)], { type: OUTPUT_FORMAT_MIME[outputFormat] })
 			);
-			exportResult.downloadName = `vidm-${mode}${mode !== 'none' ? `-${ratio.label}` : ''}-${speed}x.mp4`;
+			exportResult.downloadName = `vidm-${mode}${mode !== 'none' ? `-${ratio.label}` : ''}-${speed}x.${outputExtension}`;
 
 			ffmpeg.off('progress', offProgress as never);
 			status = 'done';
@@ -241,15 +273,12 @@
 
 	{#if status === 'configuring' && !sourceFile}
 		<UploadDropzone onFile={handleFile} />
+		{#if sourceLoadError}
+			<p class="text-destructive text-sm">{sourceLoadError}</p>
+		{/if}
 	{/if}
 
 	{#if sourceFile && (status === 'configuring' || status === 'error')}
-		<ToolTabs
-			tabs={toolTabs}
-			active={activeTool}
-			onActiveChange={(id) => (activeTool = id as ActiveTool)}
-		/>
-
 		<Card>
 			<CardContent>
 				<SourcePreview
@@ -257,6 +286,7 @@
 					{ratio}
 					bind:crop
 					{showCropBox}
+					onLoadError={handleSourceLoadError}
 					bind:sourceWidth
 					bind:sourceHeight
 					bind:sourceDuration
@@ -269,51 +299,64 @@
 			</CardContent>
 		</Card>
 
-		<Card>
-			<CardContent class="space-y-4">
-				<div class={activeTool === 'trim' ? 'space-y-4' : 'hidden'}>
-					<TrimControl bind:trimStart bind:trimEnd {sourceDuration} disabled={captionsGenerating} />
-				</div>
-				<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
-					<FormatToggle bind:mode />
-					{#if mode !== 'none'}
-						<RatioSelector bind:ratio />
-					{/if}
-				</div>
-				<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
-					<SpeedControl bind:speed />
-				</div>
-				<div class={activeTool === 'volume' ? 'space-y-4' : 'hidden'}>
-					<VolumeControl bind:volume />
-				</div>
-				<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
-					<CompressionControl bind:compression />
-				</div>
-				<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
-					<CaptionsPanel
-						file={sourceFile}
-						bind:segments={captionSegments}
-						bind:style={captionStyle}
-						bind:generating={captionsGenerating}
-						{trimStart}
-						{trimEnd}
-						{sourceDuration}
-					/>
-				</div>
-			</CardContent>
-		</Card>
+		{#if sourceDuration === 0}
+			<p class="text-muted-foreground text-sm">Loading video…</p>
+		{:else}
+			<ToolTabs
+				tabs={toolTabs}
+				active={activeTool}
+				onActiveChange={(id) => (activeTool = id as ActiveTool)}
+			/>
 
-		<Card>
-			<CardContent class="flex flex-col items-start gap-1.5">
-				{#if exportSummary.length > 0}
-					<p class="text-muted-foreground text-sm">{exportSummary.join(' · ')}</p>
-				{/if}
-				<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
-				{#if !hasActiveTransform}
-					<p class="text-muted-foreground text-sm">{missingOptionsMessage}</p>
-				{/if}
-			</CardContent>
-		</Card>
+			<Card>
+				<CardContent class="space-y-4">
+					<div class={activeTool === 'format' ? 'space-y-4' : 'hidden'}>
+						<OutputFormatControl bind:outputFormat bind:gifQuality />
+					</div>
+					<div class={activeTool === 'trim' ? 'space-y-4' : 'hidden'}>
+						<TrimControl bind:trimStart bind:trimEnd {sourceDuration} disabled={captionsGenerating} />
+					</div>
+					<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
+						<FormatToggle bind:mode />
+						{#if mode !== 'none'}
+							<RatioSelector bind:ratio />
+						{/if}
+					</div>
+					<div class={activeTool === 'speed' ? 'space-y-4' : 'hidden'}>
+						<SpeedControl bind:speed />
+					</div>
+					<div class={activeTool === 'volume' ? 'space-y-4' : 'hidden'}>
+						<VolumeControl bind:volume />
+					</div>
+					<div class={activeTool === 'compression' ? 'space-y-4' : 'hidden'}>
+						<CompressionControl bind:compression />
+					</div>
+					<div class={activeTool === 'captions' ? 'space-y-4' : 'hidden'}>
+						<CaptionsPanel
+							file={sourceFile}
+							bind:segments={captionSegments}
+							bind:style={captionStyle}
+							bind:generating={captionsGenerating}
+							{trimStart}
+							{trimEnd}
+							{sourceDuration}
+						/>
+					</div>
+				</CardContent>
+			</Card>
+
+			<Card>
+				<CardContent class="flex flex-col items-start gap-1.5">
+					{#if exportSummary.length > 0}
+						<p class="text-muted-foreground text-sm">{exportSummary.join(' · ')}</p>
+					{/if}
+					<Button onclick={run} disabled={!hasActiveTransform}>Export</Button>
+					{#if !hasActiveTransform}
+						<p class="text-muted-foreground text-sm">{missingOptionsMessage}</p>
+					{/if}
+				</CardContent>
+			</Card>
+		{/if}
 	{/if}
 
 	{#if status === 'loading-engine'}

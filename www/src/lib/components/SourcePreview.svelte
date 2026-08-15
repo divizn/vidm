@@ -20,7 +20,8 @@
 		trimEnd = $bindable(0),
 		clampToTrim = false,
 		speed = 1,
-		volume = 1
+		volume = 1,
+		onLoadError
 	}: {
 		file: File;
 		ratio: AspectRatio;
@@ -34,6 +35,12 @@
 		clampToTrim?: boolean;
 		speed?: number;
 		volume?: number;
+		// Fired when the browser can't decode `file` as a video at all (e.g. a
+		// GIF or some other non-video file dropped in): the <video> element's
+		// own `error` event, code 4 (MEDIA_ERR_SRC_NOT_SUPPORTED), fires
+		// reliably for this rather than hanging forever waiting for metadata
+		// that will never arrive.
+		onLoadError: () => void;
 	} = $props();
 
 	let videoEl: HTMLVideoElement | undefined = $state();
@@ -269,6 +276,7 @@
 		bind:this={videoEl}
 		src={objectUrl}
 		onloadedmetadata={onLoadedMetadata}
+		onerror={onLoadError}
 		ontimeupdate={onTimeUpdate}
 		onplay={() => (isPaused = false)}
 		onpause={() => (isPaused = true)}

@@ -2,6 +2,8 @@ import {
 	COMPRESSION_PRESETS,
 	type AspectRatio,
 	type CompressionSettings,
+	type GifQualityPreset,
+	type OutputFormat,
 	type ReformatMode
 } from '$lib/ffmpeg/filters';
 import { formatTimecode } from '$lib/timecode';
@@ -15,6 +17,12 @@ function compressionLabel(compression: CompressionSettings): string {
 	return `Compression (CRF ${compression.crf})`;
 }
 
+// Only called when formatActive (outputFormat !== 'mp4'), and gif is the
+// only other format, so this only ever needs to label that one case.
+function formatLabel(gifQuality: GifQualityPreset): string {
+	return `GIF (${gifQuality.label})`;
+}
+
 export interface EditorSummaryInput {
 	mode: ReformatMode;
 	ratio: AspectRatio;
@@ -25,9 +33,18 @@ export interface EditorSummaryInput {
 	trimStart: number;
 	trimEnd: number;
 	sourceDuration: number;
+	outputFormat: OutputFormat;
+	gifQuality: GifQualityPreset;
 }
 
-export type ToolId = 'trim' | 'reformat' | 'speed' | 'volume' | 'compression' | 'captions';
+export type ToolId =
+	| 'format'
+	| 'trim'
+	| 'reformat'
+	| 'speed'
+	| 'volume'
+	| 'compression'
+	| 'captions';
 
 export interface ToolState {
 	id: ToolId;
@@ -54,11 +71,25 @@ export function buildToolStates(input: EditorSummaryInput): ToolState[] {
 	const trimActive = input.trimStart > 0 || input.trimEnd < input.sourceDuration;
 	const reformatActive = input.mode !== 'none';
 	const speedActive = input.speed !== 1;
-	const volumeActive = input.volume !== 1;
-	const compressionActive = input.compression.mode !== 'none';
+	// GIF has no audio track and no CRF/bitrate concept of its own, so
+	// neither tool's setting actually does anything while it's selected,
+	// same reasoning as ToolTabs locking their tabs out in that state.
+	const volumeActive = input.outputFormat !== 'gif' && input.volume !== 1;
+	const compressionActive = input.outputFormat !== 'gif' && input.compression.mode !== 'none';
 	const captionsActive = input.hasCaptionSegments;
+	const formatActive = input.outputFormat !== 'mp4';
 
 	return [
+		// Listed first: it decides what Volume/Compression can do (both go
+		// inactive/locked once GIF is picked), so it comes before everything
+		// it can affect rather than after, in both tab order and the export
+		// summary.
+		{
+			id: 'format',
+			label: 'Format',
+			active: formatActive,
+			summaryText: formatActive ? formatLabel(input.gifQuality) : undefined
+		},
 		{
 			id: 'trim',
 			label: 'Trim',
