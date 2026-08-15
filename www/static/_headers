@@ -1,9 +1,19 @@
+# The script-src placeholder below is filled in by scripts/inject-csp-hashes.mjs
+# (a postbuild step) with this build's actual inline <script> hashes, so
+# script-src never needs 'unsafe-inline'. script-src and connect-src also
+# need blob: (not just worker-src) since @ffmpeg/ffmpeg's toBlobURL()
+# pattern dynamically import()s ffmpeg-core.js (script-src) and fetch()es
+# blob: URLs internally (connect-src), alongside creating the actual worker
+# (worker-src) — CSP governs each of those three separately. connect-src
+# also allows api.github.com for Footer.svelte's star-count fetch,
+# everything else stays same-origin.
 /*
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' blob: __INLINE_SCRIPT_HASHES__; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' blob: https://api.github.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
 
-# Large WASM/model assets served from R2 via worker.ts (Workers migration —
-# these used to be Pages Functions) — immutable, versioned by filename in
+# Large WASM/model assets served from R2 via worker.ts (Workers migration,
+# these used to be Pages Functions), immutable, versioned by filename in
 # practice (these don't change without a code change), so cache them for a
 # year rather than re-downloading on every visit.
 /ffmpeg/ffmpeg-core.wasm

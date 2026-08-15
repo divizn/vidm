@@ -13,6 +13,12 @@ const config = {
 		adapter: adapter({
 			fallback: 'index.html'
 		})
+		// kit.csp's hash mode only injects a <meta> CSP tag into
+		// server-rendered HTML — this app disables SSR entirely (see
+		// +layout.ts), so there's no rendered output for it to hash. The CSP
+		// (including this build's inline-script hashes) is computed by
+		// scripts/inject-csp-hashes.mjs instead, into build/_headers as a
+		// real HTTP header. See static/_headers for the base policy.
 	}
 };
 
