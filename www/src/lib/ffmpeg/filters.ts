@@ -102,6 +102,42 @@ export const DEFAULT_COMPRESSION: CompressionSettings = {
 	targetMB: 10
 };
 
+// WebM (libvpx-vp9) was tried and dropped: ffmpeg.wasm's realtime-deadline
+// VP9 encode crashes with a WASM "memory access out of bounds" trap (a
+// widely-reported upstream bug, e.g. ffmpegwasm/ffmpeg.wasm#786/#679/#591),
+// and the crash-safe deadline is far too slow to be usable in-browser
+// (~25 of ~298 frames in 30s wall time on a short test clip).
+export type OutputFormat = 'mp4' | 'gif';
+export const DEFAULT_OUTPUT_FORMAT: OutputFormat = 'mp4';
+
+export const OUTPUT_FORMAT_EXTENSIONS: Record<OutputFormat, string> = {
+	mp4: 'mp4',
+	gif: 'gif'
+};
+
+export const OUTPUT_FORMAT_MIME: Record<OutputFormat, string> = {
+	mp4: 'video/mp4',
+	gif: 'image/gif'
+};
+
+// GIF has no CRF/bitrate concept of its own: size and quality are driven by
+// frame rate and pixel width instead (fed into the palettegen/paletteuse
+// filter chain in buildExportArgs), so it gets its own preset shape rather
+// than reusing CompressionPreset.
+export interface GifQualityPreset {
+	label: string;
+	fps: number;
+	maxWidth: number;
+}
+
+export const GIF_QUALITY_PRESETS: GifQualityPreset[] = [
+	{ label: 'Small', fps: 10, maxWidth: 360 },
+	{ label: 'Balanced', fps: 15, maxWidth: 480 },
+	{ label: 'Smooth', fps: 20, maxWidth: 640 }
+];
+
+export const DEFAULT_GIF_QUALITY: GifQualityPreset = GIF_QUALITY_PRESETS[1];
+
 // Fixed audio bitrate whenever audio gets re-encoded (needed so 'size' mode
 // can budget for it) — see needsAudioReencode below.
 const AUDIO_BITRATE_KBPS = 128;
@@ -160,6 +196,9 @@ export interface ExportOptions {
 	// $lib/captions/ass.ts), buildExportArgs only wires the filter in.
 	captionsAssPath?: string;
 	captionsFontsDir?: string;
+	outputFormat: OutputFormat;
+	// Only consulted when outputFormat === 'gif'.
+	gifQuality: GifQualityPreset;
 }
 
 // The final output frame size for a given mode/ratio/crop/source — exposed
@@ -202,7 +241,9 @@ export function buildExportArgs(
 		sourceWidth,
 		sourceHeight,
 		captionsAssPath,
-		captionsFontsDir
+		captionsFontsDir,
+		outputFormat,
+		gifQuality
 	} = options;
 
 	// Applied as *input* options (before -i), using -t (duration) rather
@@ -231,10 +272,26 @@ export function buildExportArgs(
 	// (`threads=6 lookahead_threads=2`) and died immediately after encoder
 	// init with Emscripten's `unwind` throw — the main thread trying to
 	// spawn a pthread the worker pool couldn't satisfy.
+	// palettegen/paletteuse (GIF quality) run their own filter-graph work
+	// too, same reasoning as libass above.
 	const extraPipelines =
-		(mode === 'blur-pad' ? 1 : 0) + (needsAudioReencode ? 1 : 0) + (captionsAssPath ? 1 : 0);
+		(mode === 'blur-pad' ? 1 : 0) +
+		(needsAudioReencode ? 1 : 0) +
+		(captionsAssPath ? 1 : 0) +
+		(outputFormat === 'gif' ? 1 : 0);
 
 	const captionsSuffix = captionsAssPath ? `,ass=${captionsAssPath}:fontsdir=${captionsFontsDir}` : '';
+	// Standard high-quality GIF recipe: downsample fps/width, then build a
+	// custom 256-colour palette from the actual clip (palettegen) instead of
+	// ffmpeg's default per-frame quantization, and dither against it
+	// (paletteuse), same idea as -crf for GIF's own quality/size trade-off.
+	// Always the last stage of whichever chain it's appended to (split's
+	// pads are local to this fragment); the caller supplies the closing
+	// [outv] label where one is needed.
+	const gifSuffix =
+		outputFormat === 'gif'
+			? `,fps=${gifQuality.fps},scale=${gifQuality.maxWidth}:-1:flags=lanczos,split[s0][s1];[s0]palettegen=stats_mode=diff[p];[s1][p]paletteuse=dither=bayer`
+			: '';
 
 	const { width: outW, height: outH } = computeOutputDimensions({
 		mode,
@@ -259,7 +316,7 @@ export function buildExportArgs(
 		// scaled only if it exceeds the output cap — never upscaled.
 		args.push(
 			'-vf',
-			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}${captionsSuffix}`
+			`crop=${crop.width}:${crop.height}:${crop.x}:${crop.y},scale=${outW}:${outH},setsar=1${speedSuffix}${captionsSuffix}${gifSuffix}`
 		);
 	} else if (mode === 'blur-pad') {
 		// -threads only caps the encoder; -filter_complex's own thread pool
@@ -269,12 +326,12 @@ export function buildExportArgs(
 			'-filter_complex_threads',
 			'1',
 			'-filter_complex',
-			`[0:v]scale=${outW}:${outH},boxblur=20:5[bg];[1:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1${speedSuffix}${captionsSuffix}[outv]`,
+			`[0:v]scale=${outW}:${outH},boxblur=20:5[bg];[1:v]scale=${outW}:${outH}:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2,setsar=1${speedSuffix}${captionsSuffix}${gifSuffix}[outv]`,
 			'-map',
-			'[outv]',
-			'-map',
-			'0:a'
+			'[outv]'
 		);
+		// GIF has no audio stream at all: nothing to map.
+		if (outputFormat !== 'gif') args.push('-map', '0:a');
 	} else {
 		// 'none': keep the source frame as-is — no crop/pad/target-ratio
 		// scale. Other options (speed/captions/compression/trim) still apply
@@ -283,7 +340,15 @@ export function buildExportArgs(
 		// untouched rather than pointlessly re-encoding a pixel-identical
 		// frame.
 		const filters: string[] = [];
-		if (needsSpeedFilters || captionsAssPath || compression.mode !== 'none' || trimIsActive) {
+		// GIF always needs a real re-encode too: the source's own codec can
+		// never just be stream-copied into a GIF.
+		if (
+			needsSpeedFilters ||
+			captionsAssPath ||
+			compression.mode !== 'none' ||
+			trimIsActive ||
+			outputFormat !== 'mp4'
+		) {
 			// Even-dimension safety net for the (rare) odd-dimensioned source —
 			// libx264/yuv420p requires even width/height. No-op scale otherwise.
 			filters.push(`scale=${outW}:${outH}`, 'setsar=1');
@@ -292,18 +357,23 @@ export function buildExportArgs(
 		if (captionsAssPath) filters.push(`ass=${captionsAssPath}:fontsdir=${captionsFontsDir}`);
 
 		if (filters.length > 0) {
-			args.push('-vf', filters.join(','));
+			args.push('-vf', filters.join(',') + gifSuffix);
 		} else {
 			args.push('-c:v', 'copy');
 			videoIsReencoded = false;
 		}
 	}
 
-	if (videoIsReencoded) {
+	if (videoIsReencoded && outputFormat === 'mp4') {
 		args.push('-preset', X264_PRESET);
 	}
+	// gif: the native gif encoder needs no extra codec flags, quality is
+	// already controlled by gifSuffix's fps/width/palette chain above.
 
-	if (needsAudioReencode) {
+	if (outputFormat === 'gif') {
+		// No audio track in a GIF at all.
+		args.push('-an');
+	} else if (needsAudioReencode) {
 		const audioFilters: string[] = [];
 		if (needsSpeedFilters) audioFilters.push(buildAtempoChain(speed));
 		if (needsVolumeFilter) audioFilters.push(`volume=${volume}`);
@@ -313,28 +383,32 @@ export function buildExportArgs(
 		args.push('-c:a', 'copy');
 	}
 
-	if (compression.mode === 'size') {
-		// Single-pass average-bitrate approximation, not two-pass: two-pass
-		// means a second encode pass over the same video — another
-		// concurrent pipeline, and another way to hit the deadlock above.
-		// Output will land close to the target, not exact.
-		const outputDurationSec = (trimEnd - trimStart) / speed;
-		const totalBits = compression.targetMB * 8 * 1024 * 1024;
-		const audioBits = AUDIO_BITRATE_KBPS * 1000 * outputDurationSec;
-		const videoBitrateKbps = Math.max(
-			100,
-			Math.round((totalBits - audioBits) / outputDurationSec / 1000)
-		);
-		args.push('-b:v', `${videoBitrateKbps}k`);
-	} else if (compression.mode !== 'none') {
-		args.push('-crf', String(compression.crf));
+	// GIF's size/quality trade-off is entirely gifQuality's fps/width, not
+	// CRF/bitrate, so skip this whole block for it.
+	if (outputFormat !== 'gif') {
+		if (compression.mode === 'size') {
+			// Single-pass average-bitrate approximation, not two-pass: two-pass
+			// means a second encode pass over the same video — another
+			// concurrent pipeline, and another way to hit the deadlock above.
+			// Output will land close to the target, not exact.
+			const outputDurationSec = (trimEnd - trimStart) / speed;
+			const totalBits = compression.targetMB * 8 * 1024 * 1024;
+			const audioBits = AUDIO_BITRATE_KBPS * 1000 * outputDurationSec;
+			const videoBitrateKbps = Math.max(
+				100,
+				Math.round((totalBits - audioBits) / outputDurationSec / 1000)
+			);
+			args.push('-b:v', `${videoBitrateKbps}k`);
+		} else if (compression.mode !== 'none') {
+			args.push('-crf', String(compression.crf));
+		}
+		// compression.mode === 'none': no explicit -crf/-b:v. If some other
+		// filter still forces a re-encode, the encoder picks its own default
+		// instead of an app-chosen target. The 'none' reformat mode's -c:v
+		// copy path above is only reachable when compression.mode is 'none'
+		// *and* trim is inactive *and* outputFormat is 'mp4', so it never
+		// conflicts with -crf/-b:v.
 	}
-	// compression.mode === 'none': no explicit -crf/-b:v. If some other
-	// filter still forces a re-encode, libx264 picks its own default (unset
-	// CRF, effectively 23) instead of an app-chosen target. The 'none'
-	// reformat mode's -c:v copy path above is only reachable when
-	// compression.mode is 'none' *and* trim is inactive too, so it never
-	// conflicts with -crf/-b:v.
 
 	// Only meaningful when an encoder actually runs — the -c:v copy fast
 	// path spawns no encoder threads to cap.

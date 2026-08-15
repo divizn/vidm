@@ -5,7 +5,13 @@ import {
 	buildToolStates,
 	type EditorSummaryInput
 } from './editor-summary';
-import { ASPECT_RATIOS, DEFAULT_COMPRESSION, type CompressionSettings } from '$lib/ffmpeg/filters';
+import {
+	ASPECT_RATIOS,
+	DEFAULT_COMPRESSION,
+	DEFAULT_GIF_QUALITY,
+	DEFAULT_OUTPUT_FORMAT,
+	type CompressionSettings
+} from '$lib/ffmpeg/filters';
 
 const offCompression: CompressionSettings = { mode: 'none', crf: 23, targetMB: 10 };
 
@@ -20,6 +26,8 @@ function baseInput(overrides: Partial<EditorSummaryInput> = {}): EditorSummaryIn
 		trimStart: 0,
 		trimEnd: 10,
 		sourceDuration: 10,
+		outputFormat: DEFAULT_OUTPUT_FORMAT,
+		gifQuality: DEFAULT_GIF_QUALITY,
 		...overrides
 	};
 }
@@ -136,9 +144,10 @@ describe('buildExportSummary', () => {
 });
 
 describe('buildToolStates', () => {
-	it('always returns all six tools, in trim/reformat/speed/volume/compression/captions order', () => {
+	it('always returns all seven tools, in format/trim/reformat/speed/volume/compression/captions order', () => {
 		const states = buildToolStates(baseInput());
 		expect(states.map((tool) => tool.id)).toEqual([
+			'format',
 			'trim',
 			'reformat',
 			'speed',
@@ -168,13 +177,33 @@ describe('buildToolStates', () => {
 		expect(byId.compression.active).toBe(false);
 		expect(byId.captions.active).toBe(false);
 	});
+
+	it('marks format active with a "GIF (preset)" label when outputFormat is gif', () => {
+		const states = buildToolStates(baseInput({ outputFormat: 'gif' }));
+		const byId = Object.fromEntries(states.map((tool) => [tool.id, tool]));
+		expect(byId.format.active).toBe(true);
+		expect(byId.format.summaryText).toBe(`GIF (${DEFAULT_GIF_QUALITY.label})`);
+	});
+
+	it('forces volume and compression inactive while outputFormat is gif, regardless of their own values', () => {
+		const states = buildToolStates(
+			baseInput({
+				outputFormat: 'gif',
+				volume: 1.5,
+				compression: DEFAULT_COMPRESSION
+			})
+		);
+		const byId = Object.fromEntries(states.map((tool) => [tool.id, tool]));
+		expect(byId.volume.active).toBe(false);
+		expect(byId.compression.active).toBe(false);
+	});
 });
 
 describe('buildMissingOptionsMessage', () => {
 	it('lists every tool label, lowercased, with an Oxford comma before "or"', () => {
 		const message = buildMissingOptionsMessage(buildToolStates(baseInput()));
 		expect(message).toBe(
-			'Select at least one option to export: trim, reformat, speed, volume, compression, or captions.'
+			'Select at least one option to export: format, trim, reformat, speed, volume, compression, or captions.'
 		);
 	});
 
