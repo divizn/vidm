@@ -1,6 +1,6 @@
 <script lang="ts">
 	const REPO = 'divizn/vidm';
-	const PROFILE_URL = 'https://github.com/divizn';
+	const REPO_URL = `https://github.com/${REPO}`;
 	const CACHE_KEY = 'vidm-github-stars';
 	const CACHE_TTL_MS = 60 * 60 * 1000;
 
@@ -56,7 +56,7 @@
 		</a>
 	</span>
 	<a
-		href={PROFILE_URL}
+		href={REPO_URL}
 		target="_blank"
 		rel="noopener noreferrer"
 		class="text-muted-foreground hover:text-foreground flex items-center gap-1.5 text-sm transition-colors"
