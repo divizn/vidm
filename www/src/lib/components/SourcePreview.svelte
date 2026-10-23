@@ -5,6 +5,7 @@
 		type AspectRatio,
 		type CropRegion
 	} from '$lib/ffmpeg/filters';
+	import { formatTimecode } from '$lib/timecode';
 	import PlayIcon from '@lucide/svelte/icons/play';
 	import PauseIcon from '@lucide/svelte/icons/pause';
 
@@ -18,6 +19,7 @@
 		sourceDuration = $bindable(0),
 		trimStart = $bindable(0),
 		trimEnd = $bindable(0),
+		currentTime = $bindable(0),
 		clampToTrim = false,
 		speed = 1,
 		volume = 1,
@@ -32,6 +34,7 @@
 		sourceDuration?: number;
 		trimStart?: number;
 		trimEnd?: number;
+		currentTime?: number;
 		clampToTrim?: boolean;
 		speed?: number;
 		volume?: number;
@@ -140,11 +143,21 @@
 	});
 
 	function onTimeUpdate() {
-		if (!clampToTrim || !videoEl) return;
+		if (!videoEl) return;
+		currentTime = videoEl.currentTime;
+		if (!clampToTrim) return;
 		if (videoEl.currentTime >= trimEnd) {
 			videoEl.currentTime = trimStart;
 			videoEl.pause();
 		}
+	}
+
+	// Plays the trimmed range from its start; the trimEnd loop-back in
+	// onTimeUpdate stops it at the out point.
+	export function playTrimRange() {
+		if (!videoEl) return;
+		videoEl.currentTime = trimStart;
+		videoEl.play();
 	}
 
 	// Live readout of the actual export resolution this crop region will
@@ -250,6 +263,7 @@
 
 	function onTrimHandlePointerDown(handle: 'start' | 'end', e: PointerEvent) {
 		if (!trimStripEl) return;
+		e.stopPropagation();
 		draggingTrimHandle = handle;
 		trimStripRect = trimStripEl.getBoundingClientRect();
 		(e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -269,6 +283,12 @@
 	function onTrimHandlePointerUp() {
 		draggingTrimHandle = null;
 	}
+
+	function onTrimStripSeek(e: PointerEvent) {
+		if (!videoEl || !trimStripEl || !sourceDuration) return;
+		const rect = trimStripEl.getBoundingClientRect();
+		videoEl.currentTime = clamp01((e.clientX - rect.left) / rect.width) * sourceDuration;
+	}
 </script>
 
 <div class="group relative mx-auto max-w-[480px]">
@@ -278,6 +298,7 @@
 		onloadedmetadata={onLoadedMetadata}
 		onerror={onLoadError}
 		ontimeupdate={onTimeUpdate}
+		onseeked={onTimeUpdate}
 		onplay={() => (isPaused = false)}
 		onpause={() => (isPaused = true)}
 		playsinline
@@ -295,10 +316,18 @@
 			<PauseIcon class="size-6" />
 		{/if}
 	</button>
+	{#if sourceDuration}
+		<div
+			class="pointer-events-none absolute top-2 left-2 rounded bg-black/60 px-1.5 py-0.5 text-xs text-white tabular-nums"
+		>
+			{formatTimecode(currentTime)} / {formatTimecode(sourceDuration)}
+		</div>
+	{/if}
 	{#if clampToTrim && sourceDuration}
 		<div
 			bind:this={trimStripEl}
 			class="absolute inset-x-0 bottom-0 h-8 touch-none"
+			onpointerdown={onTrimStripSeek}
 		>
 			<div class="absolute inset-0 bg-black/35"></div>
 			<div
@@ -313,6 +342,10 @@
 				class="border-primary bg-primary/20 absolute inset-y-0 border-t-2"
 				style:left={`${(trimStart / sourceDuration) * 100}%`}
 				style:width={`${((trimEnd - trimStart) / sourceDuration) * 100}%`}
+			></div>
+			<div
+				class="pointer-events-none absolute inset-y-0 w-0.5 bg-white shadow-[0_0_4px_rgba(0,0,0,0.8)]"
+				style:left={`${(currentTime / sourceDuration) * 100}%`}
 			></div>
 			<div
 				class="bg-primary absolute -top-1.5 -bottom-1.5 w-1.5 touch-none rounded-full shadow-[0_0_6px_rgba(0,0,0,0.6)] cursor-ew-resize"
