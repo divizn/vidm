@@ -3,16 +3,21 @@
 	import { formatTimecode, parseTimecode } from '$lib/timecode';
 	import { Label } from '$lib/components/ui/label';
 	import { Input } from '$lib/components/ui/input';
+	import { Button } from '$lib/components/ui/button';
 
 	let {
 		trimStart = $bindable(),
 		trimEnd = $bindable(),
 		sourceDuration,
+		currentTime = 0,
+		onPreview,
 		disabled = false
 	}: {
 		trimStart: number;
 		trimEnd: number;
 		sourceDuration: number;
+		currentTime?: number;
+		onPreview?: () => void;
 		disabled?: boolean;
 	} = $props();
 
@@ -32,12 +37,16 @@
 		if (parsed === null) return;
 		trimEnd = Math.max(Math.min(parsed, sourceDuration), trimStart + MIN_TRIM_DURATION_SECONDS);
 	}
+
+	const canSetStart = $derived(currentTime <= trimEnd - MIN_TRIM_DURATION_SECONDS);
+	const canSetEnd = $derived(currentTime >= trimStart + MIN_TRIM_DURATION_SECONDS);
 </script>
 
 <fieldset {disabled} class="space-y-3">
 	<legend class="mb-1 text-sm font-semibold">Trim</legend>
 	<p class="text-muted-foreground text-sm">
-		Drag the handles directly on the video above, or type exact times below.
+		Drag the handles directly on the video above, click the strip to move the
+		playhead, or type exact times below.
 	</p>
 	<div class="flex flex-wrap items-center gap-3">
 		<Label for="trim-start" class="font-normal">Start:</Label>
@@ -61,5 +70,28 @@
 		<span class="text-muted-foreground text-sm"
 			>Duration: {formatTimecode(trimEnd - trimStart)}</span
 		>
+	</div>
+	<div class="flex flex-wrap items-center gap-2">
+		<Button
+			type="button"
+			variant="outline"
+			size="sm"
+			disabled={disabled || !canSetStart}
+			onclick={() => (trimStart = currentTime)}
+		>
+			Start at {formatTimecode(currentTime)}
+		</Button>
+		<Button
+			type="button"
+			variant="outline"
+			size="sm"
+			disabled={disabled || !canSetEnd}
+			onclick={() => (trimEnd = currentTime)}
+		>
+			End at {formatTimecode(currentTime)}
+		</Button>
+		<Button type="button" variant="secondary" size="sm" {disabled} onclick={onPreview}>
+			Preview trim
+		</Button>
 	</div>
 </fieldset>

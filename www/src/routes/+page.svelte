@@ -97,6 +97,8 @@
 	// trimEnd < sourceDuration as "trim active", so this must become the
 	// real duration before either renders anything trim-related.
 	let trimEnd = $state(0);
+	let currentTime = $state(0);
+	let sourcePreview: SourcePreview | undefined = $state();
 
 	// Mirrors how `crop` gets derived from source dimensions once metadata
 	// loads (see SourcePreview): trim defaults to the full range the first
@@ -165,6 +167,7 @@
 		sourceLoadError = '';
 		trimStart = 0;
 		trimEnd = 0; // re-derived once metadata loads, via the $effect above
+		currentTime = 0;
 		activeTool = 'format';
 	}
 
@@ -282,6 +285,7 @@
 		<Card>
 			<CardContent>
 				<SourcePreview
+					bind:this={sourcePreview}
 					file={sourceFile}
 					{ratio}
 					bind:crop
@@ -292,6 +296,7 @@
 					bind:sourceDuration
 					bind:trimStart
 					bind:trimEnd
+					bind:currentTime
 					clampToTrim={activeTool === 'trim'}
 					{speed}
 					{volume}
@@ -314,7 +319,14 @@
 						<OutputFormatControl bind:outputFormat bind:gifQuality />
 					</div>
 					<div class={activeTool === 'trim' ? 'space-y-4' : 'hidden'}>
-						<TrimControl bind:trimStart bind:trimEnd {sourceDuration} disabled={captionsGenerating} />
+						<TrimControl
+							bind:trimStart
+							bind:trimEnd
+							{sourceDuration}
+							{currentTime}
+							onPreview={() => sourcePreview?.playTrimRange()}
+							disabled={captionsGenerating}
+						/>
 					</div>
 					<div class={activeTool === 'reformat' ? 'space-y-4' : 'hidden'}>
 						<FormatToggle bind:mode />
