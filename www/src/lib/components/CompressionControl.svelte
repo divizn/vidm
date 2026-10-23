@@ -18,6 +18,7 @@
 	}: { compression: CompressionSettings; disabled?: boolean } = $props();
 
 	const modes: { value: CompressionMode; label: string }[] = [
+		{ value: 'none', label: 'Original' },
 		{ value: 'preset', label: 'Quality preset' },
 		{ value: 'size', label: 'Target file size' },
 		{ value: 'custom', label: 'Custom (CRF)' }
