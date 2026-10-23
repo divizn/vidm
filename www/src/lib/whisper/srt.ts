@@ -41,3 +41,38 @@ export function formatSrtTimestamp(seconds: number): string {
 	const pad = (n: number, len = 2) => String(n).padStart(len, '0');
 	return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
 }
+
+// .srt or .vtt text -> segments; cue numbers, vtt headers and cue settings are ignored
+export function parseSrt(text: string): CaptionSegment[] {
+	const time = /(?:(\d+):)?(\d{1,2}):(\d{2})[,.](\d{1,3})/;
+	const toSeconds = (m: RegExpMatchArray) =>
+		Number(m[1] ?? 0) * 3600 +
+		Number(m[2]) * 60 +
+		Number(m[3]) +
+		Number(m[4].padEnd(3, '0')) / 1000;
+
+	return text
+		.replace(/^﻿/, '')
+		.split(/\r?\n\s*\r?\n/)
+		.flatMap((block) => {
+			const lines = block.split(/\r?\n/);
+			const i = lines.findIndex((line) => line.includes('-->'));
+			if (i === -1) return [];
+			const [fromPart, toPart] = lines[i].split('-->');
+			const from = fromPart.match(time);
+			const to = toPart.match(time);
+			const body = lines
+				.slice(i + 1)
+				.map((line) => line.trim())
+				.filter(Boolean)
+				.join(' ');
+			if (!from || !to || !body) return [];
+			return [
+				{
+					from: formatSrtTimestamp(toSeconds(from)),
+					to: formatSrtTimestamp(toSeconds(to)),
+					text: body
+				}
+			];
+		});
+}
