@@ -83,6 +83,7 @@
 	let sourceHeight = $state(0);
 	let crop = $state<CropRegion>({ x: 0, y: 0, width: 0, height: 0 });
 	let captionSegments = $state<CaptionSegment[]>([]);
+	const captionLines = $derived(captionSegments.filter((s) => s.text.trim()));
 	let captionStyle = $state<CaptionStyle>({ ...DEFAULT_CAPTION_STYLE });
 	let activeTool = $state<ActiveTool>('format');
 	// True while CaptionsPanel has a transcription in flight: locks trim
@@ -123,7 +124,7 @@
 			speed,
 			volume,
 			compression,
-			hasCaptionSegments: captionSegments.length > 0,
+			hasCaptionSegments: captionLines.length > 0,
 			trimStart,
 			trimEnd,
 			sourceDuration,
@@ -199,7 +200,7 @@
 
 			let captionsAssPath: string | undefined;
 			let captionsFontsDir: string | undefined;
-			if (captionSegments.length > 0) {
+			if (captionLines.length > 0) {
 				const { width: outW, height: outH } = computeOutputDimensions({
 					mode,
 					ratio,
@@ -207,7 +208,7 @@
 					sourceWidth,
 					sourceHeight
 				});
-				const assContent = buildAssSubtitle(captionSegments, captionStyle, outW, outH, speed);
+				const assContent = buildAssSubtitle(captionLines, captionStyle, outW, outH, speed);
 				await ffmpeg.writeFile('captions.ass', assContent);
 				await ffmpeg.createDir('fonts');
 				await ffmpeg.writeFile(
@@ -352,6 +353,7 @@
 							{trimStart}
 							{trimEnd}
 							{sourceDuration}
+							{currentTime}
 						/>
 					</div>
 				</CardContent>
