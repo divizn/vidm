@@ -16,11 +16,13 @@
 		formatEta,
 		remainingFromChunks
 	} from '$lib/eta';
-	import { toSrt, type CaptionSegment } from '$lib/whisper/srt';
+	import { toSrt, parseSrtTimestamp, type CaptionSegment } from '$lib/whisper/srt';
+	import { addSegment, setSegmentTimes, shiftSegments } from '$lib/captions/edit';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { fetchFile } from '@ffmpeg/util';
-	import { formatTimecode } from '$lib/timecode';
+	import { formatTimecode, parseTimecode } from '$lib/timecode';
+	import XIcon from '@lucide/svelte/icons/x';
 	import { Button } from '$lib/components/ui/button';
 	import { Input } from '$lib/components/ui/input';
 	import CaptionStyleControl from './CaptionStyleControl.svelte';
@@ -33,6 +35,7 @@
 		trimStart,
 		trimEnd,
 		sourceDuration,
+		currentTime = 0,
 		generating = $bindable(false)
 	}: {
 		file: File;
@@ -41,6 +44,7 @@
 		trimStart: number;
 		trimEnd: number;
 		sourceDuration: number;
+		currentTime?: number;
 		// True while a transcription is in flight: lets the parent lock trim
 		// editing for the duration, since extractAudioForTranscription below
 		// captures trimStart/trimEnd once at the start of the run and a mid-flight
@@ -50,6 +54,10 @@
 	} = $props();
 
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
+	const clipDuration = $derived(trimEnd - trimStart);
+	const playhead = $derived(Math.min(Math.max(0, currentTime - trimStart), clipDuration));
+	// hand-written or hand-timed lines survive a trim change instead of being cleared
+	let manual = $state(false);
 
 	type Status = 'idle' | 'transcribing' | 'done' | 'error';
 
@@ -91,9 +99,13 @@
 
 	$effect(() => {
 		if ((trimStart !== prevTrimStart || trimEnd !== prevTrimEnd) && segments.length > 0) {
-			segments = [];
-			status = 'idle';
-			clearedByTrimChange = true;
+			if (manual) {
+				segments = shiftSegments(segments, prevTrimStart - trimStart, trimEnd - trimStart);
+			} else {
+				segments = [];
+				status = 'idle';
+				clearedByTrimChange = true;
+			}
 		}
 		prevTrimStart = trimStart;
 		prevTrimEnd = trimEnd;
@@ -111,6 +123,29 @@
 		// plain (non-karaoke) text for this segment instead of highlighting
 		// against stale word boundaries.
 		segments[index] = { ...segments[index], text, words: undefined };
+	}
+
+	function editSegmentTime(index: number, edge: 'from' | 'to', value: string) {
+		const seconds = parseTimecode(value);
+		if (seconds === null) return;
+		manual = true;
+		segments = setSegmentTimes(segments, index, { [edge]: seconds }, clipDuration);
+	}
+
+	function addLine() {
+		manual = true;
+		segments = addSegment(segments, playhead, clipDuration);
+	}
+
+	function deleteLine(index: number) {
+		manual = true;
+		segments = segments.filter((_, i) => i !== index);
+	}
+
+	function writeManually() {
+		clearedByTrimChange = false;
+		status = 'done';
+		addLine();
 	}
 
 	// Always extracts a clean mono 16kHz WAV via ffmpeg before transcribing,
@@ -226,6 +261,7 @@
 		startedAt = Date.now();
 		errorMessage = '';
 		clearedByTrimChange = false;
+		manual = false;
 		generating = true;
 
 		try {
@@ -340,7 +376,12 @@
 			pick up the new range.
 		</p>
 	{/if}
-	<Button onclick={generate}>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button>
+	<div class="flex flex-wrap gap-2">
+		<Button onclick={generate}
+			>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button
+		>
+		<Button variant="outline" onclick={writeManually}>Write captions</Button>
+	</div>
 	{#if trimActive}
 		<p class="text-muted-foreground text-sm">
 			Captions will be generated for the trimmed range ({formatTimecode(trimStart)}–{formatTimecode(
@@ -369,18 +410,49 @@
 {/if}
 
 {#if status === 'done'}
-	<ul class="max-h-64 space-y-2 overflow-y-auto">
-		{#each segments as segment, i (i)}
+	<p class="text-muted-foreground text-sm">
+		Times are from the start of the clip{trimActive ? ' (after trim)' : ''}. Pause the video and
+		add a line to start one at the playhead.
+	</p>
+	<ul class="max-h-80 space-y-3 overflow-y-auto">
+		{#each segments as segment, i (`${segment.from}-${i}`)}
 			<li class="space-y-1">
-				<span class="text-muted-foreground text-xs">{segment.from} → {segment.to}</span>
+				<div class="flex items-center gap-1.5">
+					<Input
+						type="text"
+						aria-label="Line {i + 1} start"
+						value={formatTimecode(parseSrtTimestamp(segment.from))}
+						onchange={(e) => editSegmentTime(i, 'from', e.currentTarget.value)}
+						class="h-7 w-20 text-xs tabular-nums"
+					/>
+					<span class="text-muted-foreground text-xs">→</span>
+					<Input
+						type="text"
+						aria-label="Line {i + 1} end"
+						value={formatTimecode(parseSrtTimestamp(segment.to))}
+						onchange={(e) => editSegmentTime(i, 'to', e.currentTarget.value)}
+						class="h-7 w-20 text-xs tabular-nums"
+					/>
+					<Button
+						variant="ghost"
+						size="icon"
+						class="ml-auto size-7"
+						aria-label="Delete line {i + 1}"
+						onclick={() => deleteLine(i)}
+					>
+						<XIcon class="size-4" />
+					</Button>
+				</div>
 				<Input
 					type="text"
 					value={segment.text}
+					placeholder="Caption text"
 					oninput={(e) => editSegmentText(i, e.currentTarget.value)}
 				/>
 			</li>
 		{/each}
 	</ul>
+	<Button variant="outline" onclick={addLine}>Add line at {formatTimecode(playhead)}</Button>
 	{#if srtUrl}
 		<Button href={srtUrl} download="captions.srt" variant="outline"
 			>Download captions.srt</Button
