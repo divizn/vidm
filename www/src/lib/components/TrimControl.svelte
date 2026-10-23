@@ -93,5 +93,17 @@
 		<Button type="button" variant="secondary" size="sm" {disabled} onclick={onPreview}>
 			Preview trim
 		</Button>
+		<Button
+			type="button"
+			variant="outline"
+			size="sm"
+			disabled={disabled || (trimStart === 0 && trimEnd === sourceDuration)}
+			onclick={() => {
+				trimStart = 0;
+				trimEnd = sourceDuration;
+			}}
+		>
+			Full clip
+		</Button>
 	</div>
 </fieldset>

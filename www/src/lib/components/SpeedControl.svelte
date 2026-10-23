@@ -2,6 +2,7 @@
 	import { MIN_SPEED, MAX_SPEED } from '$lib/ffmpeg/filters';
 	import { Slider } from '$lib/components/ui/slider';
 	import { Label } from '$lib/components/ui/label';
+	import { Button } from '$lib/components/ui/button';
 
 	let {
 		speed = $bindable(),
@@ -35,5 +36,14 @@
 			class="flex-1"
 		/>
 		<span class="text-sm tabular-nums">{speed.toFixed(2)}x</span>
+		<Button
+			type="button"
+			variant="outline"
+			size="sm"
+			disabled={disabled || speed === 1}
+			onclick={() => (speed = 1)}
+		>
+			Original
+		</Button>
 	</div>
 </fieldset>

@@ -9,13 +9,14 @@
 	}: { mode: ReformatMode; disabled?: boolean } = $props();
 
 	const options: { value: ReformatMode; label: string }[] = [
+		{ value: 'none', label: 'Original' },
 		{ value: 'crop', label: 'Center crop' },
 		{ value: 'blur-pad', label: 'Blur padded' }
 	];
 </script>
 
 <fieldset {disabled} class="space-y-2">
-	<legend class="mb-1 text-sm font-semibold">Portrait format</legend>
+	<legend class="mb-1 text-sm font-semibold">Reformat</legend>
 	<RadioGroup
 		value={mode}
 		onValueChange={(v) => (mode = v as ReformatMode)}
