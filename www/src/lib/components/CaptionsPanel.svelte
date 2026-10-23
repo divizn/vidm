@@ -16,7 +16,7 @@
 		formatEta,
 		remainingFromChunks
 	} from '$lib/eta';
-	import { toSrt, parseSrtTimestamp, type CaptionSegment } from '$lib/whisper/srt';
+	import { toSrt, parseSrt, parseSrtTimestamp, type CaptionSegment } from '$lib/whisper/srt';
 	import { addSegment, setSegmentTimes, shiftSegments } from '$lib/captions/edit';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
@@ -140,6 +140,23 @@
 	function deleteLine(index: number) {
 		manual = true;
 		segments = segments.filter((_, i) => i !== index);
+	}
+
+	let importInput: HTMLInputElement | undefined = $state();
+	let importError = $state('');
+
+	async function importCaptions(file: File | undefined) {
+		if (!file) return;
+		const imported = shiftSegments(parseSrt(await file.text()), 0, clipDuration);
+		if (imported.length === 0) {
+			importError = `No captions in ${file.name} fall within the clip.`;
+			return;
+		}
+		importError = '';
+		clearedByTrimChange = false;
+		manual = true;
+		segments = imported;
+		status = 'done';
 	}
 
 	function writeManually() {
@@ -369,6 +386,20 @@
 	}
 </script>
 
+<input
+	bind:this={importInput}
+	type="file"
+	accept=".srt,.vtt"
+	class="hidden"
+	onchange={(e) => {
+		importCaptions(e.currentTarget.files?.[0]);
+		e.currentTarget.value = '';
+	}}
+/>
+{#if importError}
+	<p class="text-destructive text-sm">{importError}</p>
+{/if}
+
 {#if status === 'idle'}
 	{#if clearedByTrimChange}
 		<p class="text-muted-foreground text-sm">
@@ -381,6 +412,7 @@
 			>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button
 		>
 		<Button variant="outline" onclick={writeManually}>Write captions</Button>
+		<Button variant="outline" onclick={() => importInput?.click()}>Import .srt</Button>
 	</div>
 	{#if trimActive}
 		<p class="text-muted-foreground text-sm">
@@ -458,6 +490,7 @@
 			>Download captions.srt</Button
 		>
 	{/if}
+	<Button variant="outline" onclick={() => importInput?.click()}>Replace from .srt</Button>
 
 	<CaptionStyleControl bind:style />
 	<CaptionPreview {segments} {style} />
