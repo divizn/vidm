@@ -59,6 +59,10 @@
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
 	const clipDuration = $derived(trimEnd - trimStart);
 	const LONG_TRANSCRIPTION_SECONDS = 10 * 60;
+	let online = $state(navigator.onLine);
+	const speechModelUnavailable = $derived(
+		!online && offline.supported && offline.status.captions === 'missing'
+	);
 	const playhead = $derived(Math.min(Math.max(0, currentTime - trimStart), clipDuration));
 	// hand-written or hand-timed lines survive a trim change instead of being cleared
 	let manual = $state(false);
@@ -407,6 +411,8 @@
 	<p class="text-destructive text-sm">{importError}</p>
 {/if}
 
+<svelte:window ononline={() => (online = true)} onoffline={() => (online = false)} />
+
 {#if status === 'idle'}
 	{#if clearedByTrimChange}
 		<p class="text-muted-foreground text-sm">
@@ -415,12 +421,18 @@
 		</p>
 	{/if}
 	<div class="flex flex-wrap gap-2">
-		<Button onclick={generate}
+		<Button onclick={generate} disabled={speechModelUnavailable}
 			>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button
 		>
 		<Button variant="outline" onclick={writeManually}>Write captions</Button>
 		<Button variant="outline" onclick={() => importInput?.click()}>Import .srt</Button>
 	</div>
+	{#if speechModelUnavailable}
+		<p class="text-muted-foreground text-sm">
+			Auto-captions need the speech model. Connect once to download it, or write or import
+			captions instead.
+		</p>
+	{/if}
 	{#if clipDuration > LONG_TRANSCRIPTION_SECONDS}
 		<p class="text-destructive text-sm">
 			This clip is {formatTimecode(clipDuration)} long. Transcription runs entirely in your
@@ -456,7 +468,7 @@
 	{/if}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
-	<Button onclick={generate}>Retry</Button>
+	<Button onclick={generate} disabled={speechModelUnavailable}>Retry</Button>
 {/if}
 
 {#if status === 'done'}
