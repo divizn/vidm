@@ -428,7 +428,7 @@
 		<Button variant="outline" onclick={() => importInput?.click()}>Import .srt</Button>
 	</div>
 	{#if speechModelUnavailable}
-		<p class="text-muted-foreground text-sm">
+		<p class="text-destructive text-sm">
 			Auto-captions need the speech model. Connect once to download it, or write or import
 			captions instead.
 		</p>
