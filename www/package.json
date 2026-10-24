@@ -7,7 +7,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"postbuild": "node scripts/inject-csp-hashes.mjs",
+		"postbuild": "node scripts/inject-csp-hashes.mjs && node scripts/build-offline-manifest.mjs",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"postinstall": "node scripts/copy-ffmpeg-core.mjs && node scripts/setup-whisper.mjs",
