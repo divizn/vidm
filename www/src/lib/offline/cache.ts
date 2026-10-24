@@ -23,7 +23,7 @@ export class OfflineSetMissingError extends Error {
 }
 
 export function offlineSupported(): boolean {
-	return 'caches' in window && 'serviceWorker' in navigator;
+	return !!window.caches && 'serviceWorker' in navigator;
 }
 
 export async function loadManifest(): Promise<OfflineManifest | null> {

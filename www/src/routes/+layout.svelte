@@ -3,11 +3,23 @@
 	import favicon from '$lib/assets/favicon.svg';
 	import Footer from '$lib/components/Footer.svelte';
 	import { registerSW } from 'virtual:pwa-register';
+	import { onMount } from 'svelte';
+	import { autoUpdate, refreshOffline } from '$lib/offline/state.svelte';
+	import { initInstall } from '$lib/offline/install.svelte';
 
 	let { children } = $props();
 
 	// no-op replaces the plugin's default window.location.reload() on update
 	registerSW({ immediate: true, onNeedReload() {} });
+
+	onMount(() => {
+		const stopInstall = initInstall();
+		(async () => {
+			await refreshOffline();
+			autoUpdate();
+		})();
+		return stopInstall;
+	});
 </script>
 
 <svelte:head>
