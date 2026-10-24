@@ -436,8 +436,8 @@
 	{#if clipDuration > LONG_TRANSCRIPTION_SECONDS}
 		<p class="text-destructive text-sm">
 			This clip is {formatTimecode(clipDuration)} long. Transcription runs entirely in your
-			browser, so clips over 10 minutes can take a long time and may run out of memory. Trimming
-			to the part you need first is faster.
+			browser, so a clip this long will take a while. Trimming to the part you need first is
+			faster.
 		</p>
 	{/if}
 	{#if trimActive}
