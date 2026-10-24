@@ -20,6 +20,7 @@
 	import { addSegment, setSegmentTimes, shiftSegments } from '$lib/captions/edit';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
+	import { ensureSet, OfflineSetMissingError } from '$lib/offline/cache';
 	import { fetchFile } from '@ffmpeg/util';
 	import { formatTimecode, parseTimecode } from '$lib/timecode';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -283,6 +284,7 @@
 		generating = true;
 
 		try {
+			await ensureSet('captions');
 			const selection = await pickBackend();
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
@@ -380,7 +382,7 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
-			resetFFmpeg();
+			if (!(err instanceof OfflineSetMissingError)) resetFFmpeg();
 		} finally {
 			generating = false;
 		}
