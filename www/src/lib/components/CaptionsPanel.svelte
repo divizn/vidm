@@ -55,6 +55,7 @@
 
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
 	const clipDuration = $derived(trimEnd - trimStart);
+	const LONG_TRANSCRIPTION_SECONDS = 10 * 60;
 	const playhead = $derived(Math.min(Math.max(0, currentTime - trimStart), clipDuration));
 	// hand-written or hand-timed lines survive a trim change instead of being cleared
 	let manual = $state(false);
@@ -414,6 +415,13 @@
 		<Button variant="outline" onclick={writeManually}>Write captions</Button>
 		<Button variant="outline" onclick={() => importInput?.click()}>Import .srt</Button>
 	</div>
+	{#if clipDuration > LONG_TRANSCRIPTION_SECONDS}
+		<p class="text-destructive text-sm">
+			This clip is {formatTimecode(clipDuration)} long. Transcription runs entirely in your
+			browser, so clips over 10 minutes can take a long time and may run out of memory. Trimming
+			to the part you need first is faster.
+		</p>
+	{/if}
 	{#if trimActive}
 		<p class="text-muted-foreground text-sm">
 			Captions will be generated for the trimmed range ({formatTimecode(trimStart)}–{formatTimecode(
