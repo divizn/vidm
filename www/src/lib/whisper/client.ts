@@ -1,6 +1,7 @@
 import { FileTranscriber, type TranscribeToken } from '@transcribe/transcriber';
 import { parseSrtTimestamp, formatSrtTimestamp, type CaptionSegment, type CaptionWord } from './srt';
 import { createEngineLog } from '$lib/log';
+import { ensureSet, cachedBlobURL } from '$lib/offline/cache';
 
 const cpuLog = createEngineLog('whisper-cpu');
 
@@ -78,11 +79,12 @@ export async function transcribeChunks(
 	console.info(
 		`[vidm:whisper-cpu] transcribing ${chunks.length} chunk(s) with whisper.cpp (WASM, CPU)`
 	);
+	await ensureSet('captions');
 	const { default: createModule } = await import(/* @vite-ignore */ SHOUT_URL);
 
 	const transcriber = new FileTranscriber({
 		createModule,
-		model: MODEL_URL,
+		model: await cachedBlobURL(MODEL_URL, 'application/octet-stream'),
 		// stderr carries whisper.cpp's ordinary banner, so it is not an error stream.
 		print: (msg) => cpuLog.line(msg),
 		printErr: (msg) => cpuLog.line(msg),

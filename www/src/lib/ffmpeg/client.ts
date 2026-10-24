@@ -1,5 +1,5 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { toBlobURL } from '@ffmpeg/util';
+import { ensureSet, cachedBlobURL } from '$lib/offline/cache';
 import { createEngineLog } from '$lib/log';
 
 export const ffmpegLog = createEngineLog('ffmpeg');
@@ -38,13 +38,14 @@ export function resetFFmpeg(): void {
 }
 
 async function loadFFmpegInstance(): Promise<FFmpeg> {
+	await ensureSet('editing');
 	const ffmpeg = new FFmpeg();
 	ffmpeg.on('log', ({ message }) => ffmpegLog.line(message));
 
 	await ffmpeg.load({
-		coreURL: await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.js`, 'text/javascript'),
-		wasmURL: await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.wasm`, 'application/wasm'),
-		workerURL: await toBlobURL(`${CORE_BASE_URL}/ffmpeg-core.worker.js`, 'text/javascript')
+		coreURL: await cachedBlobURL(`${CORE_BASE_URL}/ffmpeg-core.js`, 'text/javascript'),
+		wasmURL: await cachedBlobURL(`${CORE_BASE_URL}/ffmpeg-core.wasm`, 'application/wasm'),
+		workerURL: await cachedBlobURL(`${CORE_BASE_URL}/ffmpeg-core.worker.js`, 'text/javascript')
 	});
 
 	return ffmpeg;

@@ -13,8 +13,9 @@ vi.mock('@ffmpeg/ffmpeg', () => ({
 	}
 }));
 
-vi.mock('@ffmpeg/util', () => ({
-	toBlobURL: vi.fn().mockResolvedValue('blob:mock')
+vi.mock('$lib/offline/cache', () => ({
+	ensureSet: vi.fn().mockResolvedValue(undefined),
+	cachedBlobURL: vi.fn().mockResolvedValue('blob:mock')
 }));
 
 beforeEach(() => {
