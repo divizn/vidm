@@ -6,7 +6,8 @@
 
 	let { children } = $props();
 
-	registerSW({ immediate: true });
+	// no-op replaces the plugin's default window.location.reload() on update
+	registerSW({ immediate: true, onNeedReload() {} });
 </script>
 
 <svelte:head>

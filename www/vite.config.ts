@@ -38,7 +38,7 @@ export default defineConfig({
 		sveltekit(),
 		SvelteKitPWA({
 			strategies: 'injectManifest',
-			registerType: 'autoUpdate',
+			registerType: 'prompt',
 			injectRegister: false,
 			kit: {
 				adapterFallback: 'index.html',
