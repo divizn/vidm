@@ -1,6 +1,7 @@
 import { toBlobURL } from '@ffmpeg/util';
 import {
 	classifySet,
+	isOfflineManifest,
 	setCacheName,
 	staleCacheNames,
 	verifyBytes,
@@ -31,15 +32,23 @@ export async function loadManifest(): Promise<OfflineManifest | null> {
 		try {
 			const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
 			if (res.ok) {
-				await cache.put(MANIFEST_URL, res.clone());
-				return (await res.json()) as OfflineManifest;
+				const manifest: unknown = await res.clone().json();
+				if (isOfflineManifest(manifest)) {
+					await cache.put(MANIFEST_URL, res);
+					return manifest;
+				}
 			}
 		} catch {
 			// fall through to the cached copy
 		}
 	}
-	const cached = await cache.match(MANIFEST_URL);
-	return cached ? ((await cached.json()) as OfflineManifest) : null;
+	try {
+		const cached = await cache.match(MANIFEST_URL);
+		const manifest: unknown = cached ? await cached.json() : null;
+		return isOfflineManifest(manifest) ? manifest : null;
+	} catch {
+		return null;
+	}
 }
 
 export async function getSetStatus(manifest: OfflineManifest, set: SetId): Promise<SetStatus> {

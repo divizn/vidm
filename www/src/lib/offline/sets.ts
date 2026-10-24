@@ -66,3 +66,12 @@ export async function verifyBytes(bytes: ArrayBuffer, sha256: string): Promise<b
 	const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
 	return hex === sha256;
 }
+
+export function isOfflineManifest(value: unknown): value is OfflineManifest {
+	const sets = (value as OfflineManifest | null)?.sets;
+	if (!sets || typeof sets !== 'object') return false;
+	return (['editing', 'captions'] as const).every((id) => {
+		const set = sets[id];
+		return !!set && typeof set.version === 'string' && Array.isArray(set.files);
+	});
+}
