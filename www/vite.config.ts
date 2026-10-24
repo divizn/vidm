@@ -5,8 +5,7 @@ import { defineConfig } from 'vitest/config';
 import type { Plugin } from 'vite';
 
 // Required for the multi-threaded ffmpeg-core (SharedArrayBuffer). The
-// static-hosted production build will need these same headers set at the
-// host, not solved yet, tracked for the phase 4 offline/hosting work.
+// production build gets these same headers from static/_headers.
 //
 // `server.headers` alone doesn't reach the document response: SvelteKit's
 // dev middleware serves that before Vite's header option applies to it,
