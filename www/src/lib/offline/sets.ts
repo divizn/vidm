@@ -60,3 +60,9 @@ export function isMetered(connection?: { type?: string; saveData?: boolean }): b
 export function toMB(bytes: number): number {
 	return Math.round(bytes / 1_000_000);
 }
+
+export async function verifyBytes(bytes: ArrayBuffer, sha256: string): Promise<boolean> {
+	const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+	const hex = Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('');
+	return hex === sha256;
+}
