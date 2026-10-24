@@ -90,7 +90,23 @@ async function readWithProgress(
 	return out.buffer;
 }
 
-export async function downloadSet(
+const inFlight = new Map<SetId, Promise<void>>();
+
+export function downloadSet(
+	manifest: OfflineManifest,
+	set: SetId,
+	onProgress?: (doneBytes: number, totalBytes: number) => void,
+	signal?: AbortSignal
+): Promise<void> {
+	let pending = inFlight.get(set);
+	if (!pending) {
+		pending = fetchSet(manifest, set, onProgress, signal).finally(() => inFlight.delete(set));
+		inFlight.set(set, pending);
+	}
+	return pending;
+}
+
+async function fetchSet(
 	manifest: OfflineManifest,
 	set: SetId,
 	onProgress?: (doneBytes: number, totalBytes: number) => void,
