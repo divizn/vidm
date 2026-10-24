@@ -18,7 +18,11 @@
 			await refreshOffline();
 			autoUpdate();
 		})();
-		return stopInstall;
+		navigator.serviceWorker?.addEventListener('controllerchange', refreshOffline);
+		return () => {
+			stopInstall();
+			navigator.serviceWorker?.removeEventListener('controllerchange', refreshOffline);
+		};
 	});
 </script>
 

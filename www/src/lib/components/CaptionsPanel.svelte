@@ -20,7 +20,9 @@
 	import { addSegment, setSegmentTimes, shiftSegments } from '$lib/captions/edit';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
-	import { ensureSet, OfflineSetMissingError } from '$lib/offline/cache';
+	import { OfflineSetMissingError } from '$lib/offline/cache';
+	import { ensureSaved, offline } from '$lib/offline/state.svelte';
+	import { toMB } from '$lib/offline/sets';
 	import { fetchFile } from '@ffmpeg/util';
 	import { formatTimecode, parseTimecode } from '$lib/timecode';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -74,6 +76,7 @@
 	// clip and reports no percentage, so name the phase instead of sitting at 0%.
 	let stage = $state<'preparing' | 'transcribing'>('preparing');
 	let errorMessage = $state('');
+	let savingModel = $state(false);
 	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
 	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
 	let quality = $state<TranscriptionQuality>('quality');
@@ -284,7 +287,8 @@
 		generating = true;
 
 		try {
-			await ensureSet('captions');
+			savingModel = true;
+			await ensureSaved('captions').finally(() => (savingModel = false));
 			const selection = await pickBackend();
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
@@ -437,7 +441,11 @@
 			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
 		</p>
 	{/if}
-	{#if stage === 'preparing'}
+	{#if stage === 'preparing' && savingModel && offline.progress}
+		<p class="text-muted-foreground text-sm">
+			Downloading speech model… {toMB(offline.progress.done)} / {toMB(offline.progress.total)} MB
+		</p>
+	{:else if stage === 'preparing'}
 		<p class="text-muted-foreground text-sm">Preparing audio…</p>
 	{:else}
 		<p class="text-muted-foreground text-sm">

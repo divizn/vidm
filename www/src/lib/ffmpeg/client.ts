@@ -1,5 +1,6 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
-import { ensureSet, cachedBlobURL } from '$lib/offline/cache';
+import { cachedBlobURL } from '$lib/offline/cache';
+import { ensureSaved } from '$lib/offline/state.svelte';
 import { createEngineLog } from '$lib/log';
 
 export const ffmpegLog = createEngineLog('ffmpeg');
@@ -38,7 +39,7 @@ export function resetFFmpeg(): void {
 }
 
 async function loadFFmpegInstance(): Promise<FFmpeg> {
-	await ensureSet('editing');
+	await ensureSaved('editing');
 	const ffmpeg = new FFmpeg();
 	ffmpeg.on('log', ({ message }) => ffmpegLog.line(message));
 

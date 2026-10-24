@@ -34,5 +34,4 @@ registerRoute(
 	}
 );
 
-self.skipWaiting();
 clientsClaim();

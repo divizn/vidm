@@ -1,5 +1,11 @@
-import { downloadSet, getSetStatus, loadManifest, offlineSupported } from './cache';
-import { isMetered, type OfflineManifest, type SetId, type SetStatus } from './sets';
+import { downloadSet, ensureSet, getSetStatus, loadManifest, offlineSupported } from './cache';
+import {
+	isMetered,
+	staleCacheNames,
+	type OfflineManifest,
+	type SetId,
+	type SetStatus
+} from './sets';
 
 const SETS: SetId[] = ['editing', 'captions'];
 
@@ -27,7 +33,18 @@ export async function refreshOffline(): Promise<void> {
 	try {
 		const manifest = await loadManifest();
 		if (manifest) {
-			for (const set of SETS) offline.status[set] = await getSetStatus(manifest, set);
+			for (const set of SETS) {
+				const status = await getSetStatus(manifest, set);
+				if (status === 'saved') {
+					const { version } = manifest.sets[set];
+					for (const name of staleCacheNames(set, version, await caches.keys())) {
+						await caches.delete(name);
+					}
+				}
+				offline.status[set] = status;
+			}
+			// without a controlling service worker the page can't load offline
+			if (!navigator.serviceWorker.controller) offline.status.editing = 'missing';
 		}
 		offline.manifest = manifest;
 		offline.supported = manifest !== null;
@@ -38,6 +55,22 @@ export async function refreshOffline(): Promise<void> {
 	}
 }
 
+let lastSaver = 0;
+
+export async function ensureSaved(set: SetId): Promise<void> {
+	const id = ++lastSaver;
+	try {
+		await ensureSet(set, (done, total) => {
+			lastSaver = id;
+			offline.progress = { done, total };
+		});
+	} finally {
+		void refreshOffline().finally(() => {
+			if (lastSaver === id) offline.progress = null;
+		});
+	}
+}
+
 export async function saveForOffline(sets: SetId[]): Promise<void> {
 	const manifest = offline.manifest;
 	if (!manifest || offline.progress) return;
@@ -45,6 +78,7 @@ export async function saveForOffline(sets: SetId[]): Promise<void> {
 	const todo = sets.filter((s) => offline.status[s] !== 'saved');
 	const total = todo.reduce((sum, s) => sum + manifest.sets[s].bytes, 0);
 	offline.progress = { done: 0, total };
+	lastSaver = 0;
 	let error = '';
 	try {
 		await navigator.storage?.persist?.();

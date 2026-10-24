@@ -30,7 +30,10 @@ export async function loadManifest(): Promise<OfflineManifest | null> {
 	const cache = await caches.open(MANIFEST_CACHE);
 	if (navigator.onLine) {
 		try {
-			const res = await fetch(MANIFEST_URL, { cache: 'no-store' });
+			const res = await fetch(MANIFEST_URL, {
+				cache: 'no-store',
+				signal: AbortSignal.timeout(5000)
+			});
 			if (res.ok) {
 				const manifest: unknown = await res.clone().json();
 				if (isOfflineManifest(manifest)) {
@@ -128,29 +131,33 @@ async function fetchSet(
 			onProgress?.(done, totalBytes);
 		});
 		if (!(await verifyBytes(body, file.sha256))) throw new Error(`${file.url} failed verification`);
-		await cache.put(
-			file.url,
-			new Response(body, {
-				headers: { 'content-type': res.headers.get('content-type') ?? 'application/octet-stream' }
-			})
-		);
+		const headers = new Headers({
+			'content-type': res.headers.get('content-type') ?? 'application/octet-stream'
+		});
+		const csp = res.headers.get('content-security-policy');
+		if (csp) headers.set('content-security-policy', csp);
+		await cache.put(file.url, new Response(body, { headers }));
 	}
 	for (const name of staleCacheNames(set, version, await caches.keys())) {
 		await caches.delete(name);
 	}
 }
 
-export async function ensureSet(set: SetId): Promise<void> {
+export async function ensureSet(
+	set: SetId,
+	onProgress?: (doneBytes: number, totalBytes: number) => void
+): Promise<void> {
 	if (!offlineSupported()) return;
-	const manifest = await loadManifest();
-	if (!manifest) return;
-	const status = await getSetStatus(manifest, set);
-	if (status === 'saved') return;
-	if (!navigator.onLine) {
-		if (status === 'missing') throw new OfflineSetMissingError(set);
-		return;
+	try {
+		const manifest = await loadManifest();
+		if (!manifest) return;
+		if ((await getSetStatus(manifest, set)) !== 'missing') return;
+		if (!navigator.onLine) throw new OfflineSetMissingError(set);
+		await downloadSet(manifest, set, onProgress);
+	} catch (err) {
+		if (err instanceof OfflineSetMissingError) throw err;
+		console.warn(`offline save of ${set} failed, using the network`, err);
 	}
-	await downloadSet(manifest, set);
 }
 
 export async function cachedBlobURL(url: string, mimeType: string): Promise<string> {

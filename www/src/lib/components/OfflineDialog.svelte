@@ -33,7 +33,12 @@
 
 	async function download() {
 		await saveForOffline(chosen);
-		if (!offline.error) done = true;
+		if (offline.error) return;
+		if (offline.status.editing === 'missing') {
+			offline.error = 'Saved. Reload the page to finish setting up offline use.';
+		} else {
+			done = true;
+		}
 	}
 </script>
 
@@ -68,7 +73,7 @@
 				</div>
 			</div>
 			{#if offline.error}
-				<p class="text-destructive">{offline.error}</p>
+				<p class="text-destructive" role="alert">{offline.error}</p>
 			{/if}
 			<Dialog.Description class="text-xs">
 				Your videos are never uploaded. You can remove these files from your browser's site settings.
