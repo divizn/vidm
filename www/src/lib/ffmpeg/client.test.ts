@@ -13,8 +13,12 @@ vi.mock('@ffmpeg/ffmpeg', () => ({
 	}
 }));
 
-vi.mock('@ffmpeg/util', () => ({
-	toBlobURL: vi.fn().mockResolvedValue('blob:mock')
+vi.mock('$lib/offline/cache', () => ({
+	cachedBlobURL: vi.fn().mockResolvedValue('blob:mock')
+}));
+
+vi.mock('$lib/offline/state.svelte', () => ({
+	ensureSaved: vi.fn().mockResolvedValue(undefined)
 }));
 
 beforeEach(() => {

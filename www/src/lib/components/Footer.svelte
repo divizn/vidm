@@ -1,10 +1,15 @@
 <script lang="ts">
+	import OfflineDialog from '$lib/components/OfflineDialog.svelte';
+	import { offline } from '$lib/offline/state.svelte';
+	import { toMB } from '$lib/offline/sets';
+
 	const REPO = 'divizn/vidm';
 	const REPO_URL = `https://github.com/${REPO}`;
 	const CACHE_KEY = 'vidm-github-stars';
 	const CACHE_TTL_MS = 60 * 60 * 1000;
 
 	let starCount = $state<number | null>(null);
+	let dialogOpen = $state(false);
 
 	function readCache(): { count: number; fetchedAt: number } | null {
 		try {
@@ -43,8 +48,34 @@
 	}
 </script>
 
-<footer class="flex justify-end items-center gap-4 py-6">
-	<span class="text-muted-foreground flex items-center gap-1.5 text-sm">
+<footer class="flex flex-wrap justify-end items-center gap-x-4 gap-y-2 py-6">
+	{#if offline.supported}
+		{#if offline.progress}
+			<span class="text-muted-foreground text-sm whitespace-nowrap" role="status">
+				Saving for offline… {toMB(offline.progress.done)} / {toMB(offline.progress.total)} MB
+			</span>
+		{:else if offline.status.editing === 'missing'}
+			<button
+				type="button"
+				class="text-muted-foreground hover:text-foreground cursor-pointer text-sm underline underline-offset-2 transition-colors"
+				onclick={() => (dialogOpen = true)}
+			>
+				Use offline
+			</button>
+		{:else if offline.status.captions === 'missing'}
+			<button
+				type="button"
+				class="text-muted-foreground hover:text-foreground cursor-pointer text-sm underline underline-offset-2 transition-colors"
+				onclick={() => (dialogOpen = true)}
+			>
+				✓ Works offline
+			</button>
+		{:else}
+			<span class="text-muted-foreground text-sm">✓ Works offline</span>
+		{/if}
+		<OfflineDialog bind:open={dialogOpen} />
+	{/if}
+	<span class="text-muted-foreground flex items-center gap-1.5 text-sm whitespace-nowrap">
 		Powered by
 		<a
 			href="https://github.com/FFmpeg/FFmpeg"

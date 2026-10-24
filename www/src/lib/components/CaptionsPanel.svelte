@@ -20,6 +20,9 @@
 	import { addSegment, setSegmentTimes, shiftSegments } from '$lib/captions/edit';
 	import { DEFAULT_CAPTION_STYLE, type CaptionStyle } from '$lib/captions/style';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
+	import { OfflineSetMissingError } from '$lib/offline/cache';
+	import { ensureSaved, offline } from '$lib/offline/state.svelte';
+	import { toMB } from '$lib/offline/sets';
 	import { fetchFile } from '@ffmpeg/util';
 	import { formatTimecode, parseTimecode } from '$lib/timecode';
 	import XIcon from '@lucide/svelte/icons/x';
@@ -56,6 +59,10 @@
 	const trimActive = $derived(trimStart > 0 || trimEnd < sourceDuration);
 	const clipDuration = $derived(trimEnd - trimStart);
 	const LONG_TRANSCRIPTION_SECONDS = 10 * 60;
+	let online = $state(navigator.onLine);
+	const speechModelUnavailable = $derived(
+		!online && offline.supported && offline.status.captions === 'missing'
+	);
 	const playhead = $derived(Math.min(Math.max(0, currentTime - trimStart), clipDuration));
 	// hand-written or hand-timed lines survive a trim change instead of being cleared
 	let manual = $state(false);
@@ -73,6 +80,7 @@
 	// clip and reports no percentage, so name the phase instead of sitting at 0%.
 	let stage = $state<'preparing' | 'transcribing'>('preparing');
 	let errorMessage = $state('');
+	let savingModel = $state(false);
 	// Speed/accuracy tier for the GPU path. 'quality' is whisper-base (default),
 	// 'fast' is whisper-tiny. Ignored by the CPU path, which has one model.
 	let quality = $state<TranscriptionQuality>('quality');
@@ -283,6 +291,8 @@
 		generating = true;
 
 		try {
+			savingModel = true;
+			await ensureSaved('captions').finally(() => (savingModel = false));
 			const selection = await pickBackend();
 			// Restart the ETA clock at the first real transcription tick. Elapsed
 			// time before that point is model download plus (on the GPU path)
@@ -380,7 +390,7 @@
 				});
 			}
 			errorMessage = err instanceof Error ? err.message : String(err);
-			resetFFmpeg();
+			if (!(err instanceof OfflineSetMissingError)) resetFFmpeg();
 		} finally {
 			generating = false;
 		}
@@ -401,6 +411,8 @@
 	<p class="text-destructive text-sm">{importError}</p>
 {/if}
 
+<svelte:window ononline={() => (online = true)} onoffline={() => (online = false)} />
+
 {#if status === 'idle'}
 	{#if clearedByTrimChange}
 		<p class="text-muted-foreground text-sm">
@@ -409,12 +421,18 @@
 		</p>
 	{/if}
 	<div class="flex flex-wrap gap-2">
-		<Button onclick={generate}
+		<Button onclick={generate} disabled={speechModelUnavailable}
 			>{clearedByTrimChange ? 'Regenerate captions' : 'Generate captions'}</Button
 		>
 		<Button variant="outline" onclick={writeManually}>Write captions</Button>
 		<Button variant="outline" onclick={() => importInput?.click()}>Import .srt</Button>
 	</div>
+	{#if speechModelUnavailable}
+		<p class="text-destructive text-sm">
+			Auto-captions need the speech model. Connect once to download it, or write or import
+			captions instead.
+		</p>
+	{/if}
 	{#if clipDuration > LONG_TRANSCRIPTION_SECONDS}
 		<p class="text-destructive text-sm">
 			This clip is {formatTimecode(clipDuration)} long. Transcription runs entirely in your
@@ -435,7 +453,11 @@
 			Downloading speech model, one time, about 130&nbsp;MB ({downloadPercent}%)
 		</p>
 	{/if}
-	{#if stage === 'preparing'}
+	{#if stage === 'preparing' && savingModel && offline.progress}
+		<p class="text-muted-foreground text-sm">
+			Downloading speech model… {toMB(offline.progress.done)} / {toMB(offline.progress.total)} MB
+		</p>
+	{:else if stage === 'preparing'}
 		<p class="text-muted-foreground text-sm">Preparing audio…</p>
 	{:else}
 		<p class="text-muted-foreground text-sm">
@@ -446,7 +468,7 @@
 	{/if}
 {:else if status === 'error'}
 	<p class="text-destructive text-sm">Something went wrong: {errorMessage}</p>
-	<Button onclick={generate}>Retry</Button>
+	<Button onclick={generate} disabled={speechModelUnavailable}>Retry</Button>
 {/if}
 
 {#if status === 'done'}

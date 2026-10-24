@@ -3,6 +3,8 @@
 	import { fetchFile } from '@ffmpeg/util';
 	import { loadFFmpeg, resetFFmpeg } from '$lib/ffmpeg/client';
 	import { exportResult } from '$lib/export-state.svelte';
+	import { offline } from '$lib/offline/state.svelte';
+	import { toMB } from '$lib/offline/sets';
 	import { estimateRemainingSeconds, formatEta } from '$lib/eta';
 	import {
 		buildExportArgs,
@@ -374,7 +376,11 @@
 	{/if}
 
 	{#if status === 'loading-engine'}
-		<p class="text-muted-foreground text-sm">Loading FFmpeg engine…</p>
+		<p class="text-muted-foreground text-sm">
+			Loading FFmpeg engine…{offline.progress
+				? ` ${toMB(offline.progress.done)} / ${toMB(offline.progress.total)} MB`
+				: ''}
+		</p>
 	{:else if status === 'processing'}
 		<p class="text-muted-foreground text-sm">
 			Reformatting… {progress}%{etaSeconds !== null ? `, about ${formatEta(etaSeconds)} remaining` : ''}

@@ -12,7 +12,10 @@ const config = {
 		// end state is a fully offline-capable PWA with no server runtime.
 		adapter: adapter({
 			fallback: 'index.html'
-		})
+		}),
+		serviceWorker: {
+			register: false
+		},
 		// kit.csp's hash mode only injects a <meta> CSP tag into
 		// server-rendered HTML — this app disables SSR entirely (see
 		// +layout.ts), so there's no rendered output for it to hash. The CSP

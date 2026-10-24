@@ -6,8 +6,8 @@ A browser-based, lightweight video editor: reformat to portrait (or
 another ratio), adjust speed, compress, export as MP4 or GIF, and
 auto-generate styled, burned-in captions, each an independent, optional
 tool. Runs entirely client-side (ffmpeg.wasm + whisper.wasm), no video is
-uploaded to a server. Offline PWA support is the long-term goal, not yet
-built (see Status).
+uploaded to a server. Works offline once the video engine and speech
+model are saved (footer "Use offline"), and can be installed as an app.
 
 ![vidm demo](https://cdn.phons.dev/vidm-demo.gif)
 
@@ -78,9 +78,10 @@ CI badge above for current status.
   whisper's token timestamps. A live CSS preview shows the exact same
   text/timing before you export, no ffmpeg run needed to check a style
   change.
-- **Offline PWA**: not started. No service worker yet, the app does
-  *not* currently work offline. OPFS storage and the ffmpeg-core/whisper
-  asset caching strategy are still to come.
+- **Offline PWA (done)**: service worker caches the app shell; the
+  ffmpeg-core and whisper model are saved on first use or ahead of time
+  via "Use offline", and update in the background. Installable. Work is
+  not yet saved across tab close (OPFS storage was descoped).
 - **UI**: redesigned on shadcn-svelte + Tailwind v4, with a manual
   dark/light theme toggle (defaults to system preference, persisted).
 - **Deployment**: CI/CD configured (GitHub Actions → Cloudflare Workers),
